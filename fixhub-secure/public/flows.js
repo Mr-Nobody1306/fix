@@ -214,10 +214,6 @@ document.getElementById("photoInput").addEventListener("change", (e) => {
 const STEPS = ["Booking confirmed", "Artisan on the way", "Arrives & inspects", "Repair in progress"];
 function activeBooking() { return S.bookings.find(b => b.id === S.activeId && ["dispatched", "enroute", "arrived", "working"].includes(b.status)) || null; }
 const Track = {
-  progOf(b) {
-    if (typeof b.prog === "number") return Math.min(1, Math.max(0, b.prog));
-    return (b.status === "arrived" || b.status === "working") ? 1 : b.status === "enroute" ? 0.55 : 0.2;
-  },
   tick(force) {
     const b = activeBooking();
     if (!b) return;
@@ -226,8 +222,12 @@ const Track = {
   }
 };
 const acceptedArtisanContacts = new Map();
+function isCurrentBookingCustomer(booking) {
+  const userId = Auth.googleUid();
+  return !!(booking && userId && (booking.customerId === userId || booking.ownerId === userId));
+}
 function acceptedArtisanContact(booking) {
-  if (!booking || !booking.customerId) return Promise.resolve(null);
+  if (!isCurrentBookingCustomer(booking)) return Promise.resolve(null);
   if (!acceptedArtisanContacts.has(booking.id)) {
     const request = Backend.acceptedArtisanContact(booking.id).then((contact) => {
       if (!contact) acceptedArtisanContacts.delete(booking.id);
@@ -240,6 +240,56 @@ function acceptedArtisanContact(booking) {
   }
   return acceptedArtisanContacts.get(booking.id);
 }
+function renderLiveGps(booking) {
+  const card = document.getElementById("liveGpsCard");
+  const state = document.getElementById("gpsShareState");
+  const coordinates = document.getElementById("gpsCoordinates");
+  const updatedAt = document.getElementById("gpsUpdatedAt");
+  if (!card || !state || !coordinates || !updatedAt) return;
+  const canView = !!(booking.artisanId && isCurrentBookingCustomer(booking));
+  card.hidden = !canView;
+  if (!canView) return;
+  const location = booking.liveLocation;
+  if (!location) {
+    state.textContent = "Waiting for the accepted artisan to share location.";
+    coordinates.hidden = true;
+    updatedAt.textContent = "";
+    document.getElementById("gpsMeta").textContent = "Waiting for artisan GPS";
+    return;
+  }
+  const updatedTime = Date.parse(location.updated_at);
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
+  if (!Number.isFinite(updatedTime) || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    booking.liveLocation = null;
+    renderLiveGps(booking);
+    return;
+  }
+  const ageSeconds = Math.max(0, Math.floor((Date.now() - updatedTime) / 1000));
+  const freshness = ageSeconds < 30 ? "Updated just now" :
+    ageSeconds < 60 ? "Updated less than a minute ago" : "Updated " + Math.floor(ageSeconds / 60) + " min ago";
+  state.textContent = "The accepted artisan is sharing live location.";
+  coordinates.textContent = latitude.toFixed(5) + ", " + longitude.toFixed(5) +
+    (location.accuracy_m ? " · ±" + Math.round(Number(location.accuracy_m)) + " m" : "");
+  coordinates.hidden = false;
+  updatedAt.textContent = freshness;
+  document.getElementById("gpsMeta").textContent = "GPS " + freshness.toLowerCase();
+}
+function refreshLiveGps(booking) {
+  if (!booking || !booking.artisanId || !isCurrentBookingCustomer(booking) || booking._gpsLoading) return;
+  if (booking._gpsCheckedAt && Date.now() - booking._gpsCheckedAt < 12000) return;
+  booking._gpsCheckedAt = Date.now();
+  booking._gpsLoading = true;
+  Backend.apiGet("/api/bookings/location?bookingId=" + encodeURIComponent(booking.id)).then((result) => {
+    if (S.activeId !== booking.id) return;
+    booking.liveLocation = result.location || null;
+    renderLiveGps(booking);
+  }).catch((error) => {
+    if (S.activeId === booking.id) {
+      document.getElementById("gpsShareState").textContent = error.message || "Could not load live location.";
+    }
+  }).finally(() => { booking._gpsLoading = false; });
+}
 function renderTrack() {
   const b = activeBooking();
   document.getElementById("trackEmpty").hidden = !!b;
@@ -251,7 +301,7 @@ function renderTrack() {
   const jobs = b.techJobs != null ? b.techJobs : "—";
   const arrived = b.status === "arrived" || b.status === "working";
   const off = !!b.offRoute && !arrived;
-  if (b.payRef && b.customerId && !b._checkingPayment && b.paymentStatus !== "confirmed") {
+  if (b.payRef && (b.customerId || b.ownerId) && !b._checkingPayment && b.paymentStatus !== "confirmed") {
     b._checkingPayment = true;
     Backend.apiGet("/api/bookings/payment-status?bookingId=" + encodeURIComponent(b.id)).then((state) => {
       b.paymentStatus = state.payment_status;
@@ -283,8 +333,10 @@ function renderTrack() {
   const meta = document.getElementById("gpsMeta");
   if (meta) {
     if (!b.artisanId) meta.textContent = "No artisan assigned yet";
-    else meta.textContent = "GPS tracking is not available yet";
+    else meta.textContent = "Waiting for artisan GPS";
   }
+  renderLiveGps(b);
+  refreshLiveGps(b);
   document.getElementById("techAvatar").textContent = b.artisanId ? String(dispName)[0].toUpperCase() : "?";
   document.getElementById("techName").textContent = dispName;
   document.getElementById("techTitle").textContent = b.artisanId ? "Accepted artisan" : "No artisan assigned yet";
@@ -296,7 +348,7 @@ function renderTrack() {
   callBtn.removeAttribute("href");
   callBtn.hidden = !b.artisanId;
   waBtn.hidden = !b.artisanId;
-  if (b.artisanId && b.customerId) {
+  if (b.artisanId && isCurrentBookingCustomer(b)) {
     acceptedArtisanContact(b).then((contact) => {
       if (S.activeId !== b.id) return;
       if (!contact) { callBtn.textContent = "Artisan contact unavailable"; return; }
@@ -322,8 +374,7 @@ function renderTrack() {
       ${cur ? '<span class="block f12 text-trust font-bold">In progress</span>' : ""}</span>`;
     box.appendChild(row);
   });
-  document.getElementById("tlFill").style.height = (idx / (STEPS.length - 1)) * 100 + "%";
-  document.getElementById("tlSteps").parentElement.style.setProperty("--x", 1);
+  document.getElementById("tlFill").setAttribute("data-progress", String(idx));
   const completeBtn = document.getElementById("confirmJobCompleteBtn");
   if (completeBtn) {
     completeBtn.hidden = !(b.customerId && b.artisanId && arrived && b.paymentStatus === "confirmed");
@@ -331,26 +382,9 @@ function renderTrack() {
     completeBtn.textContent = b.payoutStatus === "processing" ? "Payout processing…" :
       b.payoutStatus === "paid" ? "Payout sent" : "Confirm job complete · release artisan payment";
   }
-  try {
-    const prog = Track.progOf(b);
-    const path = document.getElementById("routePath");
-    if (path && path.getTotalLength) {
-      const L = path.getTotalLength();
-      const pt = path.getPointAtLength(L * prog);
-      const pt2 = path.getPointAtLength(Math.min(L, L * prog + 2));
-      const car = document.getElementById("carMarker");
-      if (car) {
-        const ox = off ? 16 : 0, oy = off ? -12 : 0;
-        car.setAttribute("transform", "translate(" + (pt.x + ox) + "," + (pt.y + oy) + ") rotate(" + (Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI) + ")");
-        car.style.opacity = off ? "0.85" : "1";
-      }
-    }
-    const mm = document.getElementById("mapEtaMin");
-    if (mm) mm.textContent = arrived ? "Arrived" : (b.etaMin ? "about " + b.etaMin + " min" : "ETA not provided");
-  } catch (e) {}
 }
 function bindArtisanContact(link, booking, name) {
-  if (!booking.customerId || !booking.artisanId) {
+  if (!isCurrentBookingCustomer(booking) || !booking.artisanId) {
     link.removeAttribute("href");
     link.textContent = "Artisan not assigned";
     return;
@@ -375,6 +409,14 @@ document.getElementById("refreshEtaBtn").onclick = async () => {
     toast("Booking status refreshed.");
   } catch (error) { toast("Could not refresh booking status."); }
 };
+window.setInterval(() => {
+  const view = document.getElementById("view-track");
+  const booking = activeBooking();
+  if (view && !view.hidden && booking) {
+    booking._gpsCheckedAt = 0;
+    refreshLiveGps(booking);
+  }
+}, 15000);
 document.getElementById("payNowBtn").onclick = () => show("pay");
 document.getElementById("cancelBtn").onclick = () => { document.getElementById("cancelDrawer").hidden = false; };
 document.getElementById("confirmCancelBtn").onclick = async (event) => withButtonBusy(event.currentTarget, "Cancelling…", async () => {
@@ -840,7 +882,6 @@ async function acceptApplication(app, b) {
     b.status = "enroute"; b.etaMin = null; b.prog = 0.06; b.offRoute = false; b.step = 1;
     if (S.activeId === b.id || !S.activeId) S.activeId = b.id;
     persist();
-    await Backend.save(b);
     toast(String(app.artisan_name).split(" ")[0] + " accepted! Tracking is live");
     renderHistory();
   } catch (e) { toast("Could not accept — check your connection"); }
@@ -862,6 +903,8 @@ const DIAG_SERVICE_CHIPS = [
   { label: "Cleaning", pick: "cleaning", detail: "Deep-clean recommended" },
   { label: "Woodwork", pick: "carpentry", detail: "Joinery repair needed" }
 ];
+const REFUND_HELP_REPLY = "ServePoint does not currently have refund processing or tracking, so I cannot verify whether a refund was issued or completed. Please contact support at 0800 349 548 for help.";
+const REFUND_QUESTION_RE = /\brefund(?:s|ed|ing)?\b|\bmoney back\b|\bpaid back\b|\bpayment (?:reversed|reversal|returned)\b|\breturned to (?:my )?account\b|\bchargeback\b/i;
 let groqMsgs = null;
 function parseGroq(content) {
   try {
@@ -957,7 +1000,13 @@ async function sendDiag(text, opt) {
   input.value = "";
   diagBubble(escapeHtml(text), "user");
   diagChips([]);
-  diagPending = null; if (await sendDiagServer(text)) return;
+  diagPending = null;
+  if (await sendDiagServer(text)) return;
+  if (REFUND_QUESTION_RE.test(text)) {
+    groqMsgs.push({ role: "assistant", content: REFUND_HELP_REPLY });
+    diagBubble(escapeHtml(REFUND_HELP_REPLY), "ai");
+    return;
+  }
   const typing = diagTyping();
   await new Promise(r => setTimeout(r, 750));
   typing.remove();
@@ -1308,6 +1357,53 @@ function renderAccount() {
 }
 
 let adminArtisans = [];
+function renderAdminOverview(overview) {
+  const metrics = document.getElementById("adminMetrics");
+  const audit = document.getElementById("adminAuditList");
+  if (!metrics || !audit) return;
+  const artisans = overview.artisans || {};
+  const bookings = overview.bookings || {};
+  const payments = overview.payments || {};
+  const cards = [
+    ["Users", overview.users],
+    ["Active artisans", artisans.active],
+    ["Suspended artisans", artisans.suspended],
+    ["Open requests", bookings.open],
+    ["Active jobs", bookings.active],
+    ["Completed jobs", bookings.completed],
+    ["Confirmed payments", payments.confirmed],
+    ["Paid artisan transfers", payments.payouts_paid]
+  ];
+  metrics.innerHTML = "";
+  cards.forEach(([label, value]) => {
+    const card = document.createElement("article");
+    card.className = "glasscard p-3 admin-metric";
+    const title = document.createElement("p");
+    title.className = "f12 soft";
+    title.textContent = label;
+    const count = document.createElement("p");
+    count.className = "font-display font-extrabold f22 mt-1";
+    count.textContent = Number.isFinite(Number(value)) ? Number(value).toLocaleString() : "—";
+    card.append(title, count);
+    metrics.appendChild(card);
+  });
+  audit.innerHTML = "";
+  const entries = Array.isArray(overview.audit) ? overview.audit : [];
+  if (!entries.length) {
+    audit.innerHTML = '<p class="f13 soft">No admin actions recorded yet.</p>';
+    return;
+  }
+  entries.forEach((entry) => {
+    const row = document.createElement("article");
+    row.className = "admin-audit-row";
+    const title = entry.action === "artisan_suspended" ? "Artisan suspended" :
+      entry.action === "artisan_reinstated" ? "Artisan restored" : "Admin action";
+    row.innerHTML = `<p class="f13 font-bold">${title} · ${escapeHtml(String(entry.artisan_id || "").slice(0, 8))}</p>
+      <p class="f12 soft mt-1">${escapeHtml(entry.admin_email || "Admin")} · ${escapeHtml(entry.created_at ? new Date(entry.created_at).toLocaleString() : "")}</p>
+      ${entry.reason ? `<p class="f12 soft mt-1">${escapeHtml(entry.reason)}</p>` : ""}`;
+    audit.appendChild(row);
+  });
+}
 function renderAdminList() {
   const list = document.getElementById("adminList");
   if (!list) return;
@@ -1379,9 +1475,13 @@ async function renderAdmin() {
   switchButton.hidden = true;
   switchButton.onclick = () => { Auth.logout(); show("account"); };
   try {
-    const result = await Backend.apiGet("/api/admin/artisans");
+    const [result, analytics] = await Promise.all([
+      Backend.apiGet("/api/admin/artisans"),
+      Backend.apiGet("/api/admin/overview")
+    ]);
     adminArtisans = Array.isArray(result.artisans) ? result.artisans : [];
-    status.textContent = "Authorized. Suspension blocks new applications; accepted jobs are not canceled.";
+    renderAdminOverview(analytics.overview || {});
+    status.textContent = "Authorized. Admin actions are recorded in the audit history.";
     status.removeAttribute("aria-busy");
     workspace.hidden = false;
     document.getElementById("adminSearch").oninput = renderAdminList;

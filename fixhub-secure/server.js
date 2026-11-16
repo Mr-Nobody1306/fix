@@ -8,15 +8,26 @@ const { createRateLimiter } = require("./src/rateLimit");
 const { serveStatic, sendJson, securityHeaders, configureHeaders } = require("./src/static");
 const { handleChat } = require("./src/chat");
 const { handleWebhook, handleBanks, handleRecipient, handleCompletion, handleBookingStatus, handlePaymentStatus } = require("./src/paystack");
-const { handleAdminArtisans, handleAdminSuspension } = require("./src/admin");
+const { handleAdminArtisans, handleAdminSuspension, handleAdminOverview } = require("./src/admin");
+const { handleBookingLocation } = require("./src/tracking");
 configureHeaders(config);
 const limiter = createRateLimiter({ windowMs: 60 * 1000, max: config.chatMaxPerMin });
 const adminLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+const trackingLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
 function dispatchAdmin(handler, req, res) {
   const ip = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : "unknown";
   if (adminLimiter.isLimited(ip)) return sendJson(res, 429, { error: "Too many admin requests. Try again shortly." });
   Promise.resolve(handler(req, res, config)).catch((err) => {
     console.error("[admin] unhandled:", err && err.message);
+    if (!res.headersSent) sendJson(res, 500, { error: "Internal error." });
+    else { try { res.end(); } catch (e2) {} }
+  });
+}
+function dispatchTracking(req, res) {
+  const ip = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : "unknown";
+  if (trackingLimiter.isLimited(ip)) return sendJson(res, 429, { error: "Too many location updates. Try again shortly." });
+  Promise.resolve(handleBookingLocation(req, res, config)).catch((err) => {
+    console.error("[booking location] unhandled:", err && err.message);
     if (!res.headersSent) sendJson(res, 500, { error: "Internal error." });
     else { try { res.end(); } catch (e2) {} }
   });
@@ -85,12 +96,20 @@ function onRequest(req, res) {
     });
     return;
   }
+  if (pathname === "/api/bookings/location") {
+    dispatchTracking(req, res);
+    return;
+  }
   if (pathname === "/api/admin/artisans") {
     dispatchAdmin(handleAdminArtisans, req, res);
     return;
   }
   if (pathname === "/api/admin/suspension") {
     dispatchAdmin(handleAdminSuspension, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/overview") {
+    dispatchAdmin(handleAdminOverview, req, res);
     return;
   }
   if (pathname === "/api/chat") {

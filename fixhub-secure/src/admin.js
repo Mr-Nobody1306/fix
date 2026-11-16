@@ -76,4 +76,16 @@ async function handleAdminSuspension(req, res, config) {
     return fail(res, 500, "Could not update the artisan account.");
   }
 }
-module.exports = { handleAdminArtisans, handleAdminSuspension };
+async function handleAdminOverview(req, res, config) {
+  if (req.method !== "GET") return fail(res, 405, "Use GET.");
+  try {
+    const user = await authorizeAdmin(req, res, config);
+    if (!user) return;
+    const overview = await supabase(config, "rpc/admin_portal_overview", "POST", {});
+    return sendJson(res, 200, { overview });
+  } catch (error) {
+    console.error("[admin overview]", error.message);
+    return fail(res, 500, "Could not load admin analytics and audit history.");
+  }
+}
+module.exports = { handleAdminArtisans, handleAdminSuspension, handleAdminOverview };

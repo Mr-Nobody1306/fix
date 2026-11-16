@@ -256,7 +256,7 @@ const Backend = {
       const g = Auth.googleUid();
       const token = await Auth.bearer();
       const q = g
-        ? "/rest/v1/bookings?select=*&customer_id=eq." + encodeURIComponent(g) + "&order=created_at.desc&limit=50"
+        ? "/rest/v1/bookings?select=*&or=(customer_id.eq." + encodeURIComponent(g) + ",owner_id.eq." + encodeURIComponent(g) + ")&order=created_at.desc&limit=50"
         : "/rest/v1/bookings?select=*" + (Auth.uid() ? "&owner_id=eq." + encodeURIComponent(Auth.uid()) : "") + "&order=created_at.desc&limit=50";
       const r = await fetch(CFG.supabaseUrl + q, { headers: this.headers(token) });
       if (!r.ok) throw 0;
@@ -368,7 +368,7 @@ function bookingToRow(b) {
   return { id: b.id, owner_id: Auth.uid(), customer_id: b.customerId || null, artisan_id: b.artisanId || null, service: b.serviceId, description: b.desc, area: b.area, slot: b.slot, date: b.date, total: b.total, service_amount: b.service, transport_amount: b.transport, discount_amount: b.discount, payment_reference: b.payRef || null, method: b.method || null, status: b.status, tech: b.tech || null, prog: (typeof b.prog === "number" ? b.prog : null), offroute: !!b.offRoute, tech_rating: (b.techRating != null ? b.techRating : null), tech_jobs: (b.techJobs != null ? b.techJobs : null) };
 }
 function rowToBooking(r) {
-  return { id: r.id, customerId: r.customer_id || null, artisanId: r.artisan_id || null, serviceId: r.service, desc: r.description, area: r.area, slot: r.slot, date: r.date, total: Number(r.total), service: r.service_amount == null ? null : Number(r.service_amount), transport: r.transport_amount == null ? null : Number(r.transport_amount), discount: r.discount_amount == null ? null : Number(r.discount_amount), payRef: r.payment_reference || null, method: r.method, status: r.status, tech: r.tech, prog: (r.prog != null ? Number(r.prog) : null), offRoute: !!r.offroute, techRating: (r.tech_rating != null ? Number(r.tech_rating) : null), techJobs: (r.tech_jobs != null ? Number(r.tech_jobs) : null) };
+  return { id: r.id, ownerId: r.owner_id || null, customerId: r.customer_id || null, artisanId: r.artisan_id || null, serviceId: r.service, desc: r.description, area: r.area, slot: r.slot, date: r.date, total: Number(r.total), service: r.service_amount == null ? null : Number(r.service_amount), transport: r.transport_amount == null ? null : Number(r.transport_amount), discount: r.discount_amount == null ? null : Number(r.discount_amount), payRef: r.payment_reference || null, method: r.method, status: r.status, tech: r.tech, prog: (r.prog != null ? Number(r.prog) : null), offRoute: !!r.offroute, techRating: (r.tech_rating != null ? Number(r.tech_rating) : null), techJobs: (r.tech_jobs != null ? Number(r.tech_jobs) : null) };
 }
 function rowToProfile(r) {
   return { id: r.id, role: r.role, name: r.name, trade: r.trade || null, area: r.area || null, rating: (r.rating != null ? Number(r.rating) : 5.0), jobs: (r.jobs != null ? Number(r.jobs) : 0), isSuspended: !!r.is_suspended, suspensionReason: r.suspension_reason || null, suspendedAt: r.suspended_at || null };
@@ -724,7 +724,9 @@ function renderHomeExtras() {
   refreshAreaPill();
   updateNotificationBadge();
   const isArtisan = S.profile && S.profile.role === "artisan";
-  document.querySelectorAll(".sp-hero, .sp-photo-wrap, .sp-help").forEach(el => { el.hidden = !!isArtisan; });
+  document.querySelectorAll(".sp-hero, .sp-photo-wrap, .sp-help, .sp-customer-only").forEach(el => { el.hidden = !!isArtisan; });
+  const artisanWelcome = document.getElementById("artisanHomeWelcome");
+  if (artisanWelcome) artisanWelcome.hidden = !isArtisan;
   document.getElementById("jobsWrap").hidden = !isArtisan;
   if (isArtisan) {
     document.getElementById("activeBanner").hidden = true;
@@ -742,6 +744,83 @@ function renderHomeExtras() {
   renderUpcoming();
 }
 let liveJobsSignature = null;
+let artisanLocationSession = null;
+async function stopArtisanLocationSharing(clearServerLocation) {
+  const session = artisanLocationSession;
+  if (!session) return;
+  artisanLocationSession = null;
+  if (session.watchId != null) navigator.geolocation.clearWatch(session.watchId);
+  if (session.button && session.button.isConnected) session.button.textContent = "Share live GPS";
+  if (session.status && session.status.isConnected) session.status.textContent = "Location sharing is off.";
+  if (clearServerLocation) {
+    try {
+      await Backend.apiPost("/api/bookings/location", { bookingId: session.bookingId, sharing: false });
+    } catch (error) {
+      if (session.status && session.status.isConnected) session.status.textContent = error.message || "Could not stop location sharing.";
+    }
+  }
+}
+function bindArtisanLocationSharing(card, booking) {
+  const button = card.querySelector("[data-location-booking]");
+  const status = card.querySelector("[data-location-status]");
+  if (!button || !status) return;
+  if (artisanLocationSession && artisanLocationSession.bookingId === booking.id) {
+    artisanLocationSession.button = button;
+    artisanLocationSession.status = status;
+    button.textContent = "Stop sharing location";
+    status.textContent = artisanLocationSession.sharing
+      ? "Sharing your latest location with this booking’s customer."
+      : "Waiting for GPS permission…";
+  } else {
+    button.textContent = "Share live GPS";
+  }
+  button.onclick = async () => {
+    if (artisanLocationSession && artisanLocationSession.bookingId === booking.id) {
+      await stopArtisanLocationSharing(true);
+      return;
+    }
+    if (!navigator.geolocation) {
+      status.textContent = "GPS is not available in this browser.";
+      return;
+    }
+    if (artisanLocationSession) await stopArtisanLocationSharing(true);
+    const session = { bookingId: booking.id, watchId: null, button, status, lastSentAt: 0, inFlight: false, sharing: false };
+    artisanLocationSession = session;
+    status.textContent = "Waiting for GPS permission…";
+    button.textContent = "Stop sharing location";
+    session.watchId = navigator.geolocation.watchPosition(async (position) => {
+      if (artisanLocationSession !== session || session.inFlight || Date.now() - session.lastSentAt < 12000) return;
+      session.inFlight = true;
+      session.lastSentAt = Date.now();
+      try {
+        await Backend.apiPost("/api/bookings/location", {
+          bookingId: session.bookingId,
+          sharing: true,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+        if (artisanLocationSession === session) {
+          session.sharing = true;
+          if (session.status && session.status.isConnected) session.status.textContent = "Sharing your latest location with this booking’s customer.";
+        }
+      } catch (error) {
+        if (artisanLocationSession === session) {
+          if (session.status && session.status.isConnected) session.status.textContent = error.message || "Could not share your location.";
+          await stopArtisanLocationSharing(true);
+        }
+      } finally {
+        session.inFlight = false;
+      }
+    }, async (error) => {
+      if (artisanLocationSession !== session) return;
+      const message = error.code === 1 ? "Location permission was denied. Allow GPS to share your location." :
+        error.code === 3 ? "GPS timed out. Check your signal and try again." : "Could not read your GPS location.";
+      await stopArtisanLocationSharing(true);
+      if (session.status && session.status.isConnected) session.status.textContent = message;
+    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  };
+}
 async function renderJobs(silent) {
   const box = document.getElementById("jobsList");
   const assignedBox = document.getElementById("assignedJobsList");
@@ -751,9 +830,12 @@ async function renderJobs(silent) {
     if (assignedBox) assignedBox.innerHTML = '<p class="f13 soft">Loading your accepted requests…</p>';
     box.innerHTML = '<p class="f14 soft">Finding open requests…</p>';
   }
-  let jobs = [], assigned = [];
+  let jobs = [], assigned = [], assignedLoadFailed = false;
   try { jobs = await Backend.openJobs(); } catch (e) { jobs = []; }
-  try { assigned = await Backend.assignedJobs(); } catch (e) { assigned = []; }
+  try { assigned = await Backend.assignedJobs(); } catch (e) { assigned = []; assignedLoadFailed = true; }
+  if (artisanLocationSession && !assignedLoadFailed && !assigned.some((job) => job.id === artisanLocationSession.bookingId)) {
+    await stopArtisanLocationSharing(false);
+  }
   const signature = JSON.stringify([
     jobs.map((job) => [job.id, job.status, job.serviceId, job.area, job.date, job.slot, job.total, job.desc]),
     assigned.map((job) => [job.id, job.status, job.serviceId, job.area, job.date, job.slot])
@@ -771,7 +853,13 @@ async function renderJobs(silent) {
       card.className = "glasscard p-4";
       card.innerHTML = `<p class="font-display font-bold f15">${escapeHtml(service.name)} · ${escapeHtml(job.id)}</p>
         <p class="f12 soft mt-1">${escapeHtml(job.area || "")} · ${escapeHtml(job.date || "")} · ${escapeHtml(job.status)}</p>
-        ${action ? '<button class="btn-dark mt-2 w-full font-display font-bold f14 rounded-2xl py-3 mh50" data-job-status="' + next + '"></button>' : '<p class="f12 soft mt-2">The customer will confirm completion after you finish.</p>'}`;
+        ${action ? '<button class="btn-dark mt-2 w-full font-display font-bold f14 rounded-2xl py-3 mh50" data-job-status="' + next + '"></button>' : '<p class="f12 soft mt-2">The customer will confirm completion after you finish.</p>'}
+        <div class="mt-3 border-t border-line pt-3">
+          <p class="f12 soft">Share your latest GPS position with this booking’s customer. Sharing stops when you turn it off or the job ends.</p>
+          <button type="button" class="mt-2 w-full rounded-xl border border-line font-bold f13 py-2.5 mh44" data-location-booking="${escapeHtml(job.id)}">Share live GPS</button>
+          <p class="f12 soft mt-1" data-location-status aria-live="polite"></p>
+        </div>`;
+      bindArtisanLocationSharing(card, job);
       const button = card.querySelector("[data-job-status]");
       if (button) {
         button.textContent = action;

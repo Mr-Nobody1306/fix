@@ -98,7 +98,7 @@
         <div id="catGrid" class="sp-homegrid"></div>
       </div>
 
-      <div id="activeBanner" class="px-4 mt-3" hidden>
+      <div id="activeBanner" class="px-4 mt-3 track-wide" hidden>
         <button id="activeBannerBtn" class="w-full text-left bg-white border border-line rounded-2xl shadow-card p-3 flex items-center gap-3">
           <span class="live-dot"></span>
           <span class="flex-1 min-w-0">
@@ -114,6 +114,19 @@
         <h2 class="font-display font-extrabold f16 px-1">Upcoming service</h2>
         <div id="upcomingCard" class="mt-2"></div>
       </div>
+
+      <section id="artisanHomeWelcome" class="sp-artisan-home px-4 mt-4" hidden>
+        <div class="sp-artisan-card">
+          <p class="sp-eyebrow">For local professionals</p>
+          <h2 class="sp-h2">Your craft, closer to home.</h2>
+          <p class="f13 text-ink-soft mt-2">Choose requests that match your trade, apply when you’re available, and keep customers updated as you work.</p>
+          <div class="sp-artisan-steps">
+            <span><b>01</b> Find a request</span>
+            <span><b>02</b> Apply in your trade</span>
+            <span><b>03</b> Update the customer</span>
+          </div>
+        </div>
+      </section>
 
       <div class="px-4 mt-4" id="jobsWrap" hidden>
         <h2 class="font-display font-extrabold f16 px-1">My accepted requests</h2>
@@ -131,6 +144,16 @@
         </div>
         <button data-goto="privacy" class="mt-2 w-full f12 font-bold text-ink-soft mh44">How we protect your privacy</button>
       </div>
+
+      <section class="sp-experience sp-customer-only" aria-labelledby="experienceTitle">
+        <p class="sp-eyebrow">The ServePoint experience</p>
+        <h2 id="experienceTitle" class="sp-h2">Good help, with you at every step.</h2>
+        <div class="sp-experience-grid">
+          <article><span>01</span><b>Describe the job</b><p>Tell us what needs attention and where.</p></article>
+          <article><span>02</span><b>Choose your artisan</b><p>Review applications from professionals in the matching trade.</p></article>
+          <article><span>03</span><b>Stay in control</b><p>Follow updates, contact your accepted artisan, and confirm the work when it’s done.</p></article>
+        </div>
+      </section>
 
       <footer class="sp-footer">
         <div class="sp-footer-top">
@@ -295,64 +318,29 @@
         <button class="mt-4 bg-trust text-white font-display font-bold rounded-2xl px-6 py-3.5 mh52" data-goto="home">Browse services</button>
       </div>
       <div id="trackBody" class="px-4 mt-3 space-y-3">
-       <div class="bg-ink text-white rounded-2xl p-4 flex items-center gap-3 shadow-card">
+       <div class="bg-ink text-white rounded-2xl p-4 flex items-center gap-3 shadow-card track-wide">
          <span class="live-dot"></span>
          <p class="font-display font-bold f15 leading-snug" id="liveBanner">Waiting for a matching artisan to accept</p>
        </div>
-        <div id="routeAlert" class="route-alert" hidden>
+        <div id="routeAlert" class="route-alert track-wide" hidden>
           <svg class="w-5 h-5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
           <span id="routeAlertText">Artisan branched off the planned route — rerouting…</span>
         </div>
-        <div class="rounded-3xl p-2 glasscard" hidden>
-          <div class="relative rounded-2xl overflow-hidden">
-            <svg id="mapSvg" viewBox="0 0 340 210" class="w-full block" aria-label="Live technician map">
-              <rect x="0" y="0" width="340" height="210" rx="16" fill="#FBE9D4"/>
-              <ellipse cx="72" cy="58" rx="48" ry="30" fill="#E1E8F1"/>
-              <ellipse cx="84" cy="52" rx="26" ry="14" fill="#D7E3F2"/>
-              <path d="M268 210 C 260 170, 300 160, 292 128 C 286 104, 310 96, 306 70 L 340 70 L 340 210 Z" fill="#D2E4F0" opacity=".7"/>
-              <g stroke="#FFFFFF" stroke-linecap="round" opacity=".9">
-                <path d="M0 100 H340" stroke-width="7"/>
-                <path d="M0 148 H340" stroke-width="7"/>
-                <path d="M120 0 V210" stroke-width="7"/>
-                <path d="M205 0 V210" stroke-width="7"/>
-                <path d="M0 40 H120" stroke-width="5"/>
-                <path d="M120 148 L205 100 L290 148" stroke-width="5" fill="none"/>
-              </g>
-              <g stroke="#EFD3B4" stroke-width="2">
-                <path d="M0 124 H340"/><path d="M162 0 V210"/><path d="M248 0 V210"/>
-              </g>
-              <g>
-                <circle cx="162" cy="72" r="4" fill="#E11D2E"/>
-                <circle cx="248" cy="124" r="4" fill="#0A7A42"/>
-              </g>
-              <path id="routeCasing" d="M52,168 C82,162 72,132 112,127 C152,122 142,96 182,91 C222,86 242,70 276,46" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" opacity=".95"/>
-              <path id="routePath" d="M52,168 C82,162 72,132 112,127 C152,122 142,96 182,91 C222,86 242,70 276,46" fill="none" stroke="#F97316" stroke-width="4.5" stroke-linecap="round" class="route-anim"/>
-              <g>
-                <circle cx="52" cy="168" r="9" fill="#111827"/>
-                <circle cx="52" cy="168" r="9" fill="none" stroke="#fff" stroke-width="2.5"/>
-                <circle cx="52" cy="168" r="3" fill="#2563EB"/>
-              </g>
-              <g id="carMarker" class="carshadow" transform="translate(52,168)">
-                <circle r="12" fill="#fff"/>
-                <rect x="-8" y="-4.5" width="16" height="9" rx="3" fill="#111827"/>
-                <rect x="-4" y="-6.5" width="8" height="4" rx="1.5" fill="#111827"/>
-                <rect x="3.5" y="-2.5" width="3" height="5" rx="1" fill="#FFD66B"/>
-              </g>
-              <g transform="translate(276,46)">
-                <circle r="14" fill="rgba(249,115,22,.25)">
-                  <animate attributeName="r" values="10;16;10" dur="2s" repeatCount="indefinite"/>
-                </circle>
-                <path d="M0,4 C-7,-3 -11,-7 -11,-12 A11,11 0 0 1 11,-12 C11,-7 7,-3 0,4 Z" fill="#111827"/>
-                <circle cy="-12" r="4" fill="#2563EB"/>
-              </g>
-            </svg>
-            <span class="arrival">
-              <span class="block font-bold soft f10">Arriving</span>
-              <span class="block font-display font-extrabold f14" id="mapEtaMin">Not shared</span>
+        <section id="liveGpsCard" class="bg-white border border-line rounded-2xl shadow-card p-4 track-location" hidden aria-live="polite">
+          <div class="flex items-center gap-3">
+            <span class="gps-pin" aria-hidden="true">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
             </span>
+            <div class="min-w-0">
+              <p class="font-display font-bold f15">Live artisan GPS</p>
+              <p id="gpsShareState" class="f12 soft mt-1">Waiting for the accepted artisan to share location.</p>
+            </div>
           </div>
-        </div>
-        <div class="bg-white border border-line rounded-2xl shadow-card p-4">
+          <p id="gpsCoordinates" class="gps-coordinates f13 font-bold mt-3" hidden></p>
+          <p id="gpsUpdatedAt" class="f12 soft mt-1"></p>
+          <p class="f11 soft mt-2">Visible only to you for this active booking. The latest point is removed when sharing stops or the job ends.</p>
+        </section>
+        <div id="trackStatusCard" class="bg-white border border-line rounded-2xl shadow-card p-4 track-status">
           <div class="flex items-center justify-between">
             <div>
               <p class="f12 text-ink-soft font-semibold">BOOKING STATUS</p>
@@ -368,7 +356,7 @@
          <p class="f12h text-ink-soft mt-2" id="routeText">Waiting for the assigned artisan to update the booking.</p>
           <p class="f12 mt-1 flex items-center gap-2"><span id="gpsMeta" class="soft">GPS tracking is not available yet</span><span id="offPill" class="offpill live">Waiting</span></p>
         </div>
-        <div class="bg-white border border-line rounded-2xl shadow-card p-4">
+        <div id="techCard" class="bg-white border border-line rounded-2xl shadow-card p-4 track-artisan">
           <div class="flex items-center gap-3">
             <span id="techAvatar" class="w-14 h-14 rounded-full bg-trust-tint text-trust-deep font-display font-extrabold f20 grid place-items-center flex-none">E</span>
             <div class="flex-1 min-w-0">
@@ -392,7 +380,7 @@
             </a>
           </div>
         </div>
-        <div class="bg-white border border-line rounded-2xl shadow-card p-4">
+        <div id="tripCard" class="bg-white border border-line rounded-2xl shadow-card p-4 track-timeline">
           <p class="font-display font-bold f15 mb-1">Trip progress</p>
           <div class="relative pl-1">
             <div class="tl-rail"></div>
@@ -400,7 +388,7 @@
             <div id="tlSteps" class="space-y-4"></div>
           </div>
         </div>
-        <div class="bg-white border border-line rounded-2xl shadow-card p-4">
+        <div id="trackHelpCard" class="bg-white border border-line rounded-2xl shadow-card p-4 track-wide">
           <p class="font-display font-bold f14">Need to reschedule or artisan delayed?</p>
           <p class="f13 text-ink-soft mt-1">Free reschedule up to 2 hours before your slot. Our team can also reassign an artisan.</p>
           <div class="grid grid-cols-2 gap-2 mt-3">
@@ -518,9 +506,18 @@
         </div>
       </header>
       <div class="px-4 mt-3 space-y-3">
-        <p id="adminStatus" class="glasscard p-4 f13 text-ink-soft" role="status" aria-live="polite">Checking administrator access…</p>
+        <p id="adminStatus" class="glasscard p-4 f13 text-ink-soft" role="status" aria-live="polite">Sign in with the authorized Google account to view this private portal.</p>
         <button id="adminSwitchAccount" class="w-full font-bold f14 rounded-2xl py-3.5 mh52 border border-line bg-white" hidden>Switch Google account</button>
         <div id="adminWorkspace" hidden>
+          <section aria-labelledby="adminMetricsTitle">
+            <h3 id="adminMetricsTitle" class="font-display font-bold f15 mb-2">ServePoint overview</h3>
+            <div id="adminMetrics" class="admin-metrics"></div>
+          </section>
+          <section class="glasscard p-4 mt-3" aria-labelledby="adminAuditTitle">
+            <h3 id="adminAuditTitle" class="font-display font-bold f15">Recent admin audit</h3>
+            <p class="f12 soft mt-1">Latest suspension and restoration actions.</p>
+            <div id="adminAuditList" class="mt-3 space-y-2"></div>
+          </section>
           <div class="glasscard p-4">
             <p class="font-display font-bold f15">Artisan accounts</p>
             <p class="f12 soft mt-1">Suspending blocks new applications and removes the artisan from discovery. Existing accepted jobs remain available.</p>
@@ -554,7 +551,7 @@
         </div>
         <div class="bg-white border border-line rounded-2xl shadow-card p-4">
           <p class="font-display font-bold f15">How it is stored</p>
-          <p class="f13 text-ink-soft mt-1">Bookings live in a secured Supabase database with row-level security: you can only read your own bookings, artisans only see open requests, and customers only see applications on their own requests. Nobody can delete records through the app.</p>
+          <p class="f13 text-ink-soft mt-1">Bookings live in a secured Supabase database with row-level security: customers see their own bookings and applications, while artisans see matching open requests and their assigned jobs. Private artisan contact details are shown only to the customer after acceptance. Nobody can delete records through the app.</p>
         </div>
         <div class="bg-white border border-line rounded-2xl shadow-card p-4">
           <p class="font-display font-bold f15">Payments</p>
@@ -562,7 +559,7 @@
         </div>
         <div class="bg-white border border-line rounded-2xl shadow-card p-4">
           <p class="font-display font-bold f15">Location & tracking</p>
-          <p class="f13 text-ink-soft mt-1">Live trip progress — map position, arrival time and detour alerts — is shared between you and your artisan or customer only while a job is active.</p>
+          <p class="f13 text-ink-soft mt-1">For an active accepted job, the artisan can choose to share live GPS. Only that booking’s customer can see the latest location; no map provider receives it. Sharing can be stopped at any time, and the saved point is deleted when sharing stops or the job ends.</p>
         </div>
         <div class="bg-white border border-line rounded-2xl shadow-card p-4">
           <p class="font-display font-bold f15">Your choices</p>

@@ -74,15 +74,23 @@ Currency and artisan accounts:
   before Google sign-in. Name, trade, and area are saved to `profiles`;
   contact numbers are stored separately in `artisan_private_details`, which
   has row-level security so artisans can access only their own phone number.
-  Run `src/supabase.sql` first, then `src/artisan-private-details.sql` and
-  `src/admin-portal.sql`. The base schema contains `profiles`, `bookings`, and
-  `applications`; the follow-up adds `artisan_private_details`,
-  `notifications`, `booking_payment_state`, and `artisan_payout_accounts`,
+  Run `src/supabase.sql` first, then `src/artisan-private-details.sql`,
+  `src/admin-portal.sql`, and `src/live-tracking.sql`. The base schema
+  contains `profiles`, `bookings`, and `applications`; the follow-up adds
+  `artisan_private_details`, `notifications`, `booking_payment_state`, and
+  `artisan_payout_accounts`,
   plus the security policies, indexes, and triggers. The admin migration adds
-  suspension enforcement and an audit log. All scripts can be re-run safely.
+  suspension enforcement and an audit log. The live-tracking migration makes
+  accepted-artisan assignment atomic, protects booking status changes, and
+  enables private, latest-point-only GPS sharing. Apply all four scripts in
+  order when upgrading an existing deployment. All scripts can be re-run safely.
 - Artisans see only open requests matching their saved trade. Customers and
   artisans receive persistent in-app notifications for applications, job
   updates, payment confirmation, and payouts.
+- During an active accepted job, an artisan can explicitly start or stop GPS
+  sharing. Only that booking's customer can retrieve the latest point; points
+  are removed when sharing stops or the job ends. Browser geolocation requires
+  HTTPS outside localhost.
 - Visible signed-in sessions refresh matching jobs and notifications every
   five seconds. New updates appear in an in-app popup without reloading.
 - The private admin portal is at `/admin` and is not linked in public navigation.
@@ -106,6 +114,9 @@ Currency and artisan accounts:
   can confirm completion. Paystack receives the bank details; ServePoint
   stores only the generated recipient code. Keep sufficient GHS balance in
   the Paystack transfer balance for payouts.
+- The in-app assistant explains verified navigation, privacy, and payment
+  behavior. Refund processing/status is not configured; the assistant cannot
+  confirm an individual refund and directs users to support at 0800 349 548.
 
 Deploying (VPS, Render, Railway…):
 

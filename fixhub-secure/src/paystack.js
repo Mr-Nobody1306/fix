@@ -94,7 +94,7 @@ async function processPaymentEvent(config, event) {
   if (!verified || verified.status !== "success" || verified.reference !== reference || verified.currency !== "GHS") {
     throw new Error("Paystack transaction verification did not match");
   }
-  const bookings = await supabase(config, "bookings?select=id,total,customer_id,artisan_id&payment_reference=eq." +
+  const bookings = await supabase(config, "bookings?select=id,total,customer_id,owner_id,artisan_id&payment_reference=eq." +
     encodeURIComponent(reference) + "&limit=1");
   const booking = bookings && bookings[0];
   if (!booking) throw new Error("No booking matches the Paystack reference");
@@ -108,7 +108,7 @@ async function processPaymentEvent(config, event) {
     payment_status: "confirmed",
     payout_status: "awaiting_completion"
   }, "resolution=ignore-duplicates,return=minimal");
-  await notify(config, booking.customer_id, booking.id, "payment_confirmed", "Payment confirmed for booking " + booking.id + ".");
+  await notify(config, booking.customer_id || booking.owner_id, booking.id, "payment_confirmed", "Payment confirmed for booking " + booking.id + ".");
 }
 async function handleWebhook(req, res, config) {
   if (req.method !== "POST") return fail(res, 405, "Use POST.");
@@ -134,13 +134,13 @@ async function handleWebhook(req, res, config) {
         const status = event.event === "transfer.success" ? "paid" : "failed";
         await supabase(config, "booking_payment_state?booking_id=eq." + encodeURIComponent(state.booking_id),
           "PATCH", { payout_status: status }, "return=minimal");
-        const bookings = await supabase(config, "bookings?select=customer_id,artisan_id&id=eq." +
+        const bookings = await supabase(config, "bookings?select=customer_id,owner_id,artisan_id&id=eq." +
           encodeURIComponent(state.booking_id) + "&limit=1");
         const booking = bookings && bookings[0];
         if (booking) {
           await notify(config, booking.artisan_id, state.booking_id, "payout_" + status,
             status === "paid" ? "Your payout for booking " + state.booking_id + " has been sent." : "Payout for booking " + state.booking_id + " needs attention.");
-          if (booking.customer_id) await notify(config, booking.customer_id, state.booking_id, "payout_" + status,
+          if (booking.customer_id || booking.owner_id) await notify(config, booking.customer_id || booking.owner_id, state.booking_id, "payout_" + status,
             status === "paid" ? "The artisan payout for booking " + state.booking_id + " is complete." : "The artisan payout for booking " + state.booking_id + " is being reviewed.");
         }
       }
@@ -217,8 +217,9 @@ async function handleCompletion(req, res, config) {
   const bookingId = String(body.bookingId || "");
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(bookingId)) return fail(res, 400, "Invalid booking.");
   try {
-    const bookings = await supabase(config, "bookings?select=id,total,status,customer_id,artisan_id&id=eq." +
-      encodeURIComponent(bookingId) + "&customer_id=eq." + encodeURIComponent(user.id) + "&limit=1");
+    const bookings = await supabase(config, "bookings?select=id,total,status,customer_id,owner_id,artisan_id&id=eq." +
+      encodeURIComponent(bookingId) + "&or=(customer_id.eq." + encodeURIComponent(user.id) +
+      ",owner_id.eq." + encodeURIComponent(user.id) + ")&limit=1");
     const booking = bookings && bookings[0];
     if (!booking) return fail(res, 404, "Booking not found.");
     const payments = await supabase(config, "booking_payment_state?select=payment_status,payout_status,payout_reference&booking_id=eq." +
@@ -304,9 +305,9 @@ async function handleBookingStatus(req, res, config) {
       "&artisan_id=eq." + encodeURIComponent(user.id) + "&status=eq." + previousStatus, "PATCH",
       { status: nextStatus }, "return=representation");
     if (!rows || !rows.length) return fail(res, 409, "The booking status has changed. Refresh and try again.");
-    const customers = await supabase(config, "bookings?select=customer_id&id=eq." + encodeURIComponent(bookingId) + "&limit=1");
+    const customers = await supabase(config, "bookings?select=customer_id,owner_id&id=eq." + encodeURIComponent(bookingId) + "&limit=1");
     if (customers && customers[0]) {
-      await notify(config, customers[0].customer_id, bookingId, "artisan_" + nextStatus,
+      await notify(config, customers[0].customer_id || customers[0].owner_id, bookingId, "artisan_" + nextStatus,
         nextStatus === "arrived" ? "Your artisan has arrived for booking " + bookingId + "." : "Work has started on booking " + bookingId + ".");
     }
     return sendJson(res, 200, { updated: true, status: nextStatus });
@@ -328,7 +329,7 @@ async function handlePaymentStatus(req, res, config) {
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(bookingId)) return fail(res, 400, "Invalid booking.");
   try {
     const bookings = await supabase(config, "bookings?select=id&id=eq." + encodeURIComponent(bookingId) +
-      "&customer_id=eq." + encodeURIComponent(user.id) + "&limit=1");
+      "&or=(customer_id.eq." + encodeURIComponent(user.id) + ",owner_id.eq." + encodeURIComponent(user.id) + ")&limit=1");
     if (!bookings || !bookings.length) return fail(res, 404, "Booking not found.");
     const rows = await supabase(config, "booking_payment_state?select=payment_status,payout_status&booking_id=eq." +
       encodeURIComponent(bookingId) + "&limit=1");

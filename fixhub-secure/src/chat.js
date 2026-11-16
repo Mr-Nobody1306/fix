@@ -7,6 +7,10 @@ const sendJson = modStatic.sendJson;
 const persona = require("./persona");
 const ai = require("./ai");
 const SERVICES = ["plumbing", "electrical", "cleaning", "carpentry", "hvac"];
+const REFUND_RESPONSE = "ServePoint does not currently have refund processing or tracking, so I cannot verify whether a refund was issued or completed. Please contact support at 0800 349 548 for help.";
+function isRefundQuestion(text) {
+  return /\brefund(?:s|ed|ing)?\b|\bmoney back\b|\bpaid back\b|\bpayment (?:reversed|reversal|returned)\b|\breturned to (?:my )?account\b|\bchargeback\b/i.test(text);
+}
 function readBody(req, maxBytes) {
   return new Promise(function (resolve, reject) {
     let size = 0;
@@ -52,6 +56,10 @@ async function handleChat(req, res, ctx) {
     if (!content.trim()) return sendJson(res, 400, { error: "Empty message." });
     clean.push({ role: m.role, content: content });
   }
+  const lastUserMessage = clean.slice().reverse().find((message) => message.role === "user");
+  if (lastUserMessage && isRefundQuestion(lastUserMessage.content)) {
+    return sendJson(res, 200, { reply: REFUND_RESPONSE, service: null, detail: "" });
+  }
   if (!config.groqKey) return sendJson(res, 503, { error: "Server AI is not configured yet." });
   const payload = [{ role: "system", content: persona.systemPrompt() }].concat(clean);
   try {
@@ -63,4 +71,10 @@ async function handleChat(req, res, ctx) {
     return sendJson(res, 502, { error: "AI provider failed — try again." });
   }
 }
-module.exports = { handleChat: handleChat, parseAnswer: parseAnswer, SERVICES: SERVICES };
+module.exports = {
+  handleChat: handleChat,
+  parseAnswer: parseAnswer,
+  isRefundQuestion: isRefundQuestion,
+  REFUND_RESPONSE: REFUND_RESPONSE,
+  SERVICES: SERVICES
+};

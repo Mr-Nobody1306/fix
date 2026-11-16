@@ -92,6 +92,20 @@ describe("backend isolation", function () {
     assert.match(adminSchema, /grant execute on function public\.admin_set_artisan_suspension.*to service_role/s);
     assert.match(adminSchema, /admin_action_log/);
   });
+  it("keeps legacy booking owners visible through the booking row-security helper", function () {
+    const baseSchema = read("src/supabase.sql");
+    const privateSchema = read("src/artisan-private-details.sql");
+    const adminSchema = read("src/admin-portal.sql");
+    const trackingSchema = read("src/live-tracking.sql");
+    for (const schema of [privateSchema, adminSchema, trackingSchema]) {
+      assert.match(schema, /booking_owner_id uuid/);
+      assert.match(schema, /booking_owner_id = auth\.uid\(\)/);
+    }
+    assert.match(privateSchema, /can_view_servepoint_booking\(customer_id, owner_id, artisan_id, service\)/);
+    assert.match(trackingSchema, /can_view_servepoint_booking\(customer_id, owner_id, artisan_id, service\)/);
+    assert.match(baseSchema, /grant update \(status\) on public\.applications to authenticated/);
+    assert.match(trackingSchema, /revoke update on public\.applications from authenticated/);
+  });
 });
 describe("currency and artisan profile behavior", function () {
   it("shows cedi amounts and sends Paystack pesewas", function () {
@@ -241,6 +255,8 @@ describe("no inline styles (CSP style-src has no unsafe-inline)", function () {
     for (const f of ["public/index.html", "public/app.js", "public/flows.js"]) {
       assert.ok(read(f).indexOf(' style="') === -1, f + " must not contain inline style attributes");
     }
+    assert.doesNotMatch(read("public/app.js") + read("public/flows.js"), /\.style\./,
+      "runtime styling must not create inline style attributes blocked by CSP");
   });
   it("no <style> blocks and no inline event-handler attributes in markup", function () {
     const html = read("public/index.html");

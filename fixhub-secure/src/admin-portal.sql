@@ -11,12 +11,13 @@ create policy profiles_active_artisan_directory
   using (id = auth.uid() or role <> 'artisan' or is_suspended = false);
 
 create or replace function public.can_view_servepoint_booking(
-  booking_customer_id uuid, booking_artisan_id uuid, booking_service text
+  booking_customer_id uuid, booking_owner_id uuid, booking_artisan_id uuid, booking_service text
 ) returns boolean
 language sql stable security definer
 set search_path = public, auth
 as $$
   select booking_customer_id = auth.uid()
+    or booking_owner_id = auth.uid()
     or booking_artisan_id = auth.uid()
     or exists (
       select 1 from public.profiles p
@@ -28,8 +29,8 @@ as $$
         ))
     );
 $$;
-revoke all on function public.can_view_servepoint_booking(uuid, uuid, text) from public;
-grant execute on function public.can_view_servepoint_booking(uuid, uuid, text) to authenticated;
+revoke all on function public.can_view_servepoint_booking(uuid, uuid, uuid, text) from public;
+grant execute on function public.can_view_servepoint_booking(uuid, uuid, uuid, text) to authenticated;
 
 drop policy if exists applications_matching_trade_insert on public.applications;
 create policy applications_matching_trade_insert
@@ -82,6 +83,45 @@ alter table public.admin_action_log enable row level security;
 revoke all on public.admin_action_log from anon, authenticated;
 grant all on public.admin_action_log to service_role;
 grant usage, select on sequence public.admin_action_log_id_seq to service_role;
+
+create or replace function public.admin_portal_overview()
+returns jsonb
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select jsonb_build_object(
+    'users', (select count(*) from public.profiles),
+    'artisans', jsonb_build_object(
+      'total', (select count(*) from public.profiles where role = 'artisan'),
+      'active', (select count(*) from public.profiles where role = 'artisan' and is_suspended = false),
+      'suspended', (select count(*) from public.profiles where role = 'artisan' and is_suspended = true)
+    ),
+    'bookings', jsonb_build_object(
+      'total', (select count(*) from public.bookings),
+      'open', (select count(*) from public.bookings where status = 'open'),
+      'active', (select count(*) from public.bookings where status in ('enroute', 'arrived', 'working')),
+      'completed', (select count(*) from public.bookings where status = 'completed'),
+      'cancelled', (select count(*) from public.bookings where status = 'cancelled')
+    ),
+    'payments', jsonb_build_object(
+      'confirmed', (select count(*) from public.booking_payment_state where payment_status = 'confirmed'),
+      'payouts_processing', (select count(*) from public.booking_payment_state where payout_status = 'processing'),
+      'payouts_paid', (select count(*) from public.booking_payment_state where payout_status = 'paid')
+    ),
+    'audit', coalesce((
+      select jsonb_agg(to_jsonb(recent))
+      from (
+        select id, admin_email, action, artisan_id, reason, created_at
+        from public.admin_action_log
+        order by created_at desc, id desc
+        limit 25
+      ) recent
+    ), '[]'::jsonb)
+  );
+$$;
+revoke all on function public.admin_portal_overview() from public, anon, authenticated;
+grant execute on function public.admin_portal_overview() to service_role;
 
 create or replace function public.prevent_client_artisan_suspension_changes()
 returns trigger

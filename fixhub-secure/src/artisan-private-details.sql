@@ -57,7 +57,7 @@ create policy artisan_private_details_accepted_customer_select
       join public.bookings b on b.id = a.booking_id
       where a.artisan_id = artisan_private_details.artisan_id
         and a.status = 'accepted'
-        and b.customer_id = auth.uid()
+        and (b.customer_id = auth.uid() or b.owner_id = auth.uid())
     )
   );
 
@@ -96,13 +96,18 @@ set artisan_id = a.artisan_id,
 from accepted a
 where b.id = a.booking_id and b.artisan_id is null;
 
-create or replace function public.can_view_servepoint_booking(
-  booking_customer_id uuid, booking_artisan_id uuid, booking_service text
+drop policy if exists bookings_matching_artisan_select on public.bookings;
+drop policy if exists bookings_skill_scoped_visibility on public.bookings;
+drop function if exists public.can_view_servepoint_booking(uuid, uuid, text);
+
+create function public.can_view_servepoint_booking(
+  booking_customer_id uuid, booking_owner_id uuid, booking_artisan_id uuid, booking_service text
 ) returns boolean
 language sql stable security definer
 set search_path = public, auth
 as $$
   select booking_customer_id = auth.uid()
+    or booking_owner_id = auth.uid()
     or booking_artisan_id = auth.uid()
     or exists (
       select 1 from public.profiles p
@@ -114,17 +119,15 @@ as $$
         ))
     );
 $$;
-revoke all on function public.can_view_servepoint_booking(uuid, uuid, text) from public;
-grant execute on function public.can_view_servepoint_booking(uuid, uuid, text) to authenticated;
+revoke all on function public.can_view_servepoint_booking(uuid, uuid, uuid, text) from public;
+grant execute on function public.can_view_servepoint_booking(uuid, uuid, uuid, text) to authenticated;
 alter table public.bookings enable row level security;
-drop policy if exists bookings_matching_artisan_select on public.bookings;
 create policy bookings_matching_artisan_select
   on public.bookings for select to authenticated
-  using (public.can_view_servepoint_booking(customer_id, artisan_id, service));
-drop policy if exists bookings_skill_scoped_visibility on public.bookings;
+  using (public.can_view_servepoint_booking(customer_id, owner_id, artisan_id, service));
 create policy bookings_skill_scoped_visibility
   on public.bookings as restrictive for select to authenticated
-  using (public.can_view_servepoint_booking(customer_id, artisan_id, service));
+  using (public.can_view_servepoint_booking(customer_id, owner_id, artisan_id, service));
 
 create unique index if not exists applications_one_accepted_per_booking
   on public.applications (booking_id) where status = 'accepted';
@@ -149,14 +152,17 @@ create policy applications_customer_decision_update
     status = 'pending'
     and exists (
       select 1 from public.bookings b
-      where b.id = applications.booking_id and b.customer_id = auth.uid() and b.status = 'open'
+      where b.id = applications.booking_id
+        and (b.customer_id = auth.uid() or b.owner_id = auth.uid())
+        and b.status = 'open'
     )
   )
   with check (
     status in ('accepted', 'declined')
     and exists (
       select 1 from public.bookings b
-      where b.id = applications.booking_id and b.customer_id = auth.uid()
+      where b.id = applications.booking_id
+        and (b.customer_id = auth.uid() or b.owner_id = auth.uid())
     )
     and (
       status <> 'accepted'
@@ -166,6 +172,8 @@ create policy applications_customer_decision_update
       )
     )
   );
+revoke update on public.applications from authenticated;
+grant update (status) on public.applications to authenticated;
 
 create table if not exists public.notifications (
   id bigint generated always as identity primary key,
@@ -199,7 +207,7 @@ returns trigger language plpgsql security definer set search_path = public
 as $$
 declare customer uuid;
 begin
-  select customer_id into customer from public.bookings where id = new.booking_id;
+  select coalesce(customer_id, owner_id) into customer from public.bookings where id = new.booking_id;
   if tg_op = 'INSERT' and customer is not null then
     insert into public.notifications (recipient_id, booking_id, type, message)
     values (customer, new.booking_id, 'artisan_applied',
@@ -230,7 +238,7 @@ begin
     from public.profiles p
     where p.role = 'artisan'
       and lower(btrim(coalesce(p.trade, ''))) = lower(btrim(coalesce(new.service, '')))
-      and p.id <> coalesce(new.customer_id, '00000000-0000-0000-0000-000000000000'::uuid);
+      and p.id <> coalesce(new.customer_id, new.owner_id, '00000000-0000-0000-0000-000000000000'::uuid);
   end if;
   return new;
 end;
