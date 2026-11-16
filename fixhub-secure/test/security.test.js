@@ -54,7 +54,7 @@ describe("backend isolation", function () {
     assert.ok(!/gsk_[A-Za-z0-9]/.test(ex), ".env.example must not contain a real key");
   });
   it("every backend module the server loads exists", function () {
-    const names = ["src/config.js", "src/persona.js", "src/ai.js", "src/chat.js", "src/rateLimit.js", "src/static.js", "src/paystack.js"];
+    const names = ["src/config.js", "src/persona.js", "src/ai.js", "src/chat.js", "src/rateLimit.js", "src/static.js", "src/paystack.js", "src/admin.js"];
     for (const f of names) assert.ok(fs.existsSync(path.join(ROOT, f)), f + " missing");
   });
   it("public config contains only the intended public credentials", function () {
@@ -76,6 +76,21 @@ describe("backend isolation", function () {
     assert.match(schema, /bookings_insert_owner/);
     assert.match(schema, /applications_matching_artisan_insert/);
     assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">/);
+  });
+  it("enforces artisan suspensions in database policies", function () {
+    const base = read("src/supabase.sql");
+    const privateSchema = read("src/artisan-private-details.sql");
+    const adminSchema = read("src/admin-portal.sql");
+    assert.match(base, /is_suspended boolean not null default false/);
+    assert.match(base, /profiles_active_artisan_directory/);
+    assert.match(base, /p\.is_suspended = false/);
+    assert.match(privateSchema, /p\.is_suspended = false/);
+    assert.match(adminSchema, /security definer/);
+    assert.match(adminSchema, /profiles_prevent_client_suspension_changes/);
+    assert.match(adminSchema, /artisan_suspension_is_server_managed/);
+    assert.match(adminSchema, /revoke all on function public\.admin_set_artisan_suspension/);
+    assert.match(adminSchema, /grant execute on function public\.admin_set_artisan_suspension.*to service_role/s);
+    assert.match(adminSchema, /admin_action_log/);
   });
 });
 describe("currency and artisan profile behavior", function () {
@@ -243,11 +258,20 @@ describe("no inline styles (CSP style-src has no unsafe-inline)", function () {
     assert.ok(html.indexOf("https://js.paystack.co/v1/inline.js") !== -1, "paystack script stays pinned in script-src");
     assert.ok(html.indexOf("Access-Control-Allow-Origin") !== -1, "the no-SRI reason must be written down next to the script tag");
   });
-  it("removes the public admin dashboard and adds a home footer", function () {
+  it("keeps the admin portal protected and out of public navigation", function () {
     const html = read("public/index.html");
     const app = read("public/app.js");
-    assert.doesNotMatch(html, /view-admin|data-goto="admin"|Administration/);
-    assert.doesNotMatch(app, /renderAdmin|adminTab/);
+    const server = read("server.js");
+    const admin = read("src/admin.js");
+    assert.match(html, /id="view-admin"/);
+    assert.doesNotMatch(html, /data-goto="admin"/);
+    assert.match(app, /"history", "admin"/);
+    assert.match(app, /protectedViews = \[[\s\S]*?"admin"/);
+    assert.match(admin, /email !== config\.adminEmail/);
+    assert.match(admin, /!googleAccount/);
+    assert.match(server, /\/api\/admin\/artisans/);
+    assert.match(server, /\/api\/admin\/suspension/);
+    assert.match(server, /pathname === "\/admin"/);
     assert.match(app, /if \(!VIEWS\.includes\(name\)\) name = "home";/);
     assert.match(html, /<footer class="sp-footer">/);
     assert.match(html, /Get support · 0800 349 548/);

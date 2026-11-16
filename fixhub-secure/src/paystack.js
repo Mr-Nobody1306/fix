@@ -339,4 +339,7 @@ async function handlePaymentStatus(req, res, config) {
     return fail(res, 500, "Could not load payment status.");
   }
 }
-module.exports = { handleWebhook, handleBanks, handleRecipient, handleCompletion, handleBookingStatus, handlePaymentStatus, signatureMatches, processPaymentEvent };
+module.exports = {
+  handleWebhook, handleBanks, handleRecipient, handleCompletion, handleBookingStatus, handlePaymentStatus,
+  signatureMatches, processPaymentEvent, currentUser, supabase, readBody
+};

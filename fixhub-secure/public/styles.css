@@ -467,6 +467,7 @@ body.nav-open #sidenav { transform: none; }
 #tlFill { height: 40px; }
 #toast { opacity: 0; pointer-events: none; }
 #toast.toast-visible { opacity: 1; pointer-events: auto; }
+#adminList textarea { min-height: 84px; resize: vertical; }
 .acceptbtn { background: #057A55; }
 .glasssoft { background: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.9); }
 .spanall { grid-column: 1 / -1; }

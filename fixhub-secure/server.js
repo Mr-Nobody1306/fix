@@ -8,8 +8,19 @@ const { createRateLimiter } = require("./src/rateLimit");
 const { serveStatic, sendJson, securityHeaders, configureHeaders } = require("./src/static");
 const { handleChat } = require("./src/chat");
 const { handleWebhook, handleBanks, handleRecipient, handleCompletion, handleBookingStatus, handlePaymentStatus } = require("./src/paystack");
+const { handleAdminArtisans, handleAdminSuspension } = require("./src/admin");
 configureHeaders(config);
 const limiter = createRateLimiter({ windowMs: 60 * 1000, max: config.chatMaxPerMin });
+const adminLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+function dispatchAdmin(handler, req, res) {
+  const ip = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : "unknown";
+  if (adminLimiter.isLimited(ip)) return sendJson(res, 429, { error: "Too many admin requests. Try again shortly." });
+  Promise.resolve(handler(req, res, config)).catch((err) => {
+    console.error("[admin] unhandled:", err && err.message);
+    if (!res.headersSent) sendJson(res, 500, { error: "Internal error." });
+    else { try { res.end(); } catch (e2) {} }
+  });
+}
 function onRequest(req, res) {
   const t0 = Date.now();
   res.on("finish", () => {
@@ -74,6 +85,14 @@ function onRequest(req, res) {
     });
     return;
   }
+  if (pathname === "/api/admin/artisans") {
+    dispatchAdmin(handleAdminArtisans, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/suspension") {
+    dispatchAdmin(handleAdminSuspension, req, res);
+    return;
+  }
   if (pathname === "/api/chat") {
     if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
     Promise.resolve(handleChat(req, res, { config, limiter })).catch((err) => {
@@ -85,7 +104,12 @@ function onRequest(req, res) {
   }
   if (pathname.startsWith("/api/")) return sendJson(res, 404, { error: "Unknown API." });
   if (req.method !== "GET") { res.writeHead(405, securityHeaders()); return res.end("Method not allowed"); }
-  return serveStatic(req, res, config.publicDir, pathname);
+  if (pathname === "/admin/") {
+    res.writeHead(308, Object.assign({ Location: "/admin" }, securityHeaders()));
+    return res.end();
+  }
+  const staticPath = pathname === "/admin" ? "/" : pathname;
+  return serveStatic(req, res, config.publicDir, staticPath);
 }
 const server = http.createServer(onRequest);
 server.listen(config.port, () => {

@@ -74,22 +74,28 @@ Currency and artisan accounts:
   before Google sign-in. Name, trade, and area are saved to `profiles`;
   contact numbers are stored separately in `artisan_private_details`, which
   has row-level security so artisans can access only their own phone number.
-  Run `src/supabase.sql` first to create the base schema, then run all of
-  `src/artisan-private-details.sql`. The base schema contains `profiles`,
-  `bookings`, and `applications`; the follow-up adds `artisan_private_details`,
+  Run `src/supabase.sql` first, then `src/artisan-private-details.sql` and
+  `src/admin-portal.sql`. The base schema contains `profiles`, `bookings`, and
+  `applications`; the follow-up adds `artisan_private_details`,
   `notifications`, `booking_payment_state`, and `artisan_payout_accounts`,
-  plus the security policies, indexes, and triggers. Both scripts can be
-  re-run safely.
+  plus the security policies, indexes, and triggers. The admin migration adds
+  suspension enforcement and an audit log. All scripts can be re-run safely.
 - Artisans see only open requests matching their saved trade. Customers and
   artisans receive persistent in-app notifications for applications, job
   updates, payment confirmation, and payouts.
 - Visible signed-in sessions refresh matching jobs and notifications every
   five seconds. New updates appear in an in-app popup without reloading.
-- The public app has no administrator dashboard or admin route. Administrative
-  database access remains limited to privileged Supabase/server credentials.
-- Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-  and `PAYSTACK_SECRET_KEY` in the server `.env` or host environment. Never put
-  the service-role or Paystack secret keys in `public/config.js`.
+- The private admin portal is at `/admin` and is not linked in public navigation.
+  Set `ADMIN_EMAIL` to the owner's Google account in the server `.env` or host
+  environment. The server verifies that exact Google identity on every admin
+  request; no admin password or service-role key is sent to the browser.
+- Suspending an artisan removes them from discovery and prevents new applications.
+  Pending applications are declined; existing accepted jobs are not canceled.
+  Suspension and reinstatement reasons are recorded in `admin_action_log`.
+- Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL`, and `PAYSTACK_SECRET_KEY` in the
+  server `.env` or host environment. Never put the service-role or Paystack
+  secret keys in `public/config.js`.
 - Set the Paystack webhook URL to `https://YOUR_DOMAIN/api/paystack/webhook`
   and enable `charge.success`, `transfer.success`, `transfer.failed`, and
   `transfer.reversed`. The webhook verifies the signature and transaction
@@ -105,7 +111,7 @@ Deploying (VPS, Render, Railway…):
 
 1. Upload everything EXCEPT .env (it is git-ignored).
 2. Set GROQ_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY,
-   SUPABASE_SERVICE_ROLE_KEY, and PAYSTACK_SECRET_KEY in the host dashboard.
+   SUPABASE_SERVICE_ROLE_KEY, ADMIN_EMAIL, and PAYSTACK_SECRET_KEY in the host dashboard.
    Fill public/config.js with only the public Supabase anon and Paystack keys.
 3. Run node server.js (or npm start). Put HTTPS in front (host TLS):
    enable the host's "force HTTPS" option. Only if the host cannot do

@@ -2,6 +2,16 @@
 -- public.applications.
 -- Contact numbers are kept separate from the artisan directory, whose profiles
 -- are readable by authenticated users.
+alter table public.profiles
+  add column if not exists is_suspended boolean not null default false,
+  add column if not exists suspension_reason text,
+  add column if not exists suspended_at timestamptz;
+
+drop policy if exists profiles_active_artisan_directory on public.profiles;
+create policy profiles_active_artisan_directory
+  on public.profiles as restrictive for select to authenticated
+  using (id = auth.uid() or role <> 'artisan' or is_suspended = false);
+
 create table if not exists public.artisan_private_details (
   artisan_id uuid primary key references public.profiles(id) on delete cascade,
   phone text not null check (char_length(btrim(phone)) between 9 and 24),
@@ -99,6 +109,7 @@ as $$
       where p.id = auth.uid()
         and (p.role = 'admin' or (
           p.role = 'artisan'
+          and p.is_suspended = false
           and lower(btrim(coalesce(p.trade, ''))) = lower(btrim(coalesce(booking_service, '')))
         ))
     );
@@ -127,6 +138,7 @@ create policy applications_matching_trade_insert
       select 1 from public.profiles p
       join public.bookings b on b.service = p.trade
       where p.id = auth.uid() and p.role = 'artisan'
+        and p.is_suspended = false
         and p.trade = applications.trade and b.id = applications.booking_id and b.status = 'open'
     )
   );
@@ -145,6 +157,13 @@ create policy applications_customer_decision_update
     and exists (
       select 1 from public.bookings b
       where b.id = applications.booking_id and b.customer_id = auth.uid()
+    )
+    and (
+      status <> 'accepted'
+      or exists (
+        select 1 from public.profiles p
+        where p.id = applications.artisan_id and p.is_suspended = false
+      )
     )
   );
 

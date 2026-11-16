@@ -506,6 +506,32 @@
       </div>
     </section>
 
+    <!-- ============ PRIVATE ADMIN PORTAL ============ -->
+    <section id="view-admin" data-view hidden>
+      <header class="px-4 pt-4 flex items-center gap-2">
+        <button class="backBtn flex items-center text-ink-soft font-semibold f14 mh44" data-goto="home" aria-label="Back to home">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div>
+          <h2 class="font-display font-extrabold f22">Admin portal</h2>
+          <p class="f13 soft">Private artisan moderation</p>
+        </div>
+      </header>
+      <div class="px-4 mt-3 space-y-3">
+        <p id="adminStatus" class="glasscard p-4 f13 text-ink-soft" role="status" aria-live="polite">Checking administrator access…</p>
+        <button id="adminSwitchAccount" class="w-full font-bold f14 rounded-2xl py-3.5 mh52 border border-line bg-white" hidden>Switch Google account</button>
+        <div id="adminWorkspace" hidden>
+          <div class="glasscard p-4">
+            <p class="font-display font-bold f15">Artisan accounts</p>
+            <p class="f12 soft mt-1">Suspending blocks new applications and removes the artisan from discovery. Existing accepted jobs remain available.</p>
+          </div>
+          <label for="adminSearch" class="block f12 font-bold text-ink-soft mt-3 mb-1">Find an artisan</label>
+          <input id="adminSearch" class="field rounded-xl p-3 f14 w-full" type="search" placeholder="Search name, trade or area">
+          <div id="adminList" class="mt-3 space-y-3"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ PRIVACY & DATA SAFETY ============ -->
     <section id="view-privacy" data-view hidden>
       <header class="px-4 pt-4 flex items-center gap-2">

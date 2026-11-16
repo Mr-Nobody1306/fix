@@ -1307,6 +1307,92 @@ function renderAccount() {
   applySenior();
 }
 
+let adminArtisans = [];
+function renderAdminList() {
+  const list = document.getElementById("adminList");
+  if (!list) return;
+  const query = String(document.getElementById("adminSearch").value || "").trim().toLowerCase();
+  const filtered = adminArtisans.filter((artisan) =>
+    [artisan.name, artisan.trade, artisan.area].some((value) => String(value || "").toLowerCase().includes(query))
+  );
+  list.innerHTML = "";
+  if (!filtered.length) {
+    list.innerHTML = '<p class="glasscard p-4 f13 soft">No matching artisan accounts.</p>';
+    return;
+  }
+  filtered.forEach((artisan) => {
+    const suspended = !!artisan.is_suspended;
+    const card = document.createElement("article");
+    card.className = "glasscard p-4 admin-card";
+    const suspensionInfo = suspended
+      ? `<div class="mt-2 rounded-xl bg-slate-100 p-3"><p class="f12 font-bold text-cancel">Suspended${artisan.suspended_at ? " · " + escapeHtml(new Date(artisan.suspended_at).toLocaleString()) : ""}</p><p class="f12 soft mt-1">${escapeHtml(artisan.suspension_reason || "No reason recorded.")}</p></div>`
+      : `<label class="block f12 font-bold text-ink-soft mt-3 mb-1" for="adminReason-${escapeHtml(artisan.id)}">Reason for suspension</label><textarea id="adminReason-${escapeHtml(artisan.id)}" class="field rounded-xl p-3 f13 w-full admin-reason" maxlength="500" placeholder="Add a brief reason (required)"></textarea>`;
+    card.innerHTML = `<div class="flex items-start gap-3">
+      <div class="flex-1 min-w-0">
+        <p class="font-display font-bold f15">${escapeHtml(artisan.name || "Unnamed artisan")}</p>
+        <p class="f12 soft mt-1">${escapeHtml(artisan.trade || "No trade")} · ${escapeHtml(artisan.area || "No area")}</p>
+        <p class="f12 soft mt-1">★ ${Number(artisan.rating || 0).toFixed(1)} · ${Number(artisan.jobs || 0)} completed jobs</p>
+      </div>
+      <span class="${suspended ? "chipx" : "greenpill"} flex-none">${suspended ? "Suspended" : "Active"}</span>
+    </div>
+    ${suspensionInfo}
+    <button type="button" class="${suspended ? "mt-3 w-full rounded-2xl border border-line font-bold f14 py-3 mh48 bg-white" : "mt-3 w-full rounded-2xl bg-cancel text-white font-bold f14 py-3 mh48"}" data-admin-id="${escapeHtml(artisan.id)}">${suspended ? "Restore artisan" : "Suspend artisan"}</button>`;
+    card.querySelector("[data-admin-id]").onclick = async (event) => {
+      const suspend = !suspended;
+      const reasonInput = suspend ? card.querySelector(".admin-reason") : null;
+      const reason = reasonInput ? reasonInput.value.trim() : "";
+      if (suspend && (reason.length < 5 || reason.length > 500)) {
+        reasonInput.focus();
+        toast("Enter a suspension reason of at least 5 characters.");
+        return;
+      }
+      if (suspend && !window.confirm("Suspend " + String(artisan.name || "this artisan") + " from new jobs?")) return;
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      try {
+        await Backend.apiPost("/api/admin/suspension", {
+          artisanId: artisan.id,
+          suspended: suspend,
+          reason
+        });
+        toast(suspend ? "Artisan suspended from new jobs." : "Artisan access restored.");
+        await renderAdmin();
+      } catch (error) {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        const status = document.getElementById("adminStatus");
+        status.textContent = error.message || "Could not update this artisan.";
+      }
+    };
+    list.appendChild(card);
+  });
+}
+async function renderAdmin() {
+  const status = document.getElementById("adminStatus");
+  const workspace = document.getElementById("adminWorkspace");
+  const switchButton = document.getElementById("adminSwitchAccount");
+  if (!status || !workspace) return;
+  status.textContent = "Verifying admin access…";
+  status.setAttribute("aria-busy", "true");
+  workspace.hidden = true;
+  switchButton.hidden = true;
+  switchButton.onclick = () => { Auth.logout(); show("account"); };
+  try {
+    const result = await Backend.apiGet("/api/admin/artisans");
+    adminArtisans = Array.isArray(result.artisans) ? result.artisans : [];
+    status.textContent = "Authorized. Suspension blocks new applications; accepted jobs are not canceled.";
+    status.removeAttribute("aria-busy");
+    workspace.hidden = false;
+    document.getElementById("adminSearch").oninput = renderAdminList;
+    renderAdminList();
+  } catch (error) {
+    status.textContent = error.message || "Could not verify admin access.";
+    status.removeAttribute("aria-busy");
+    switchButton.hidden = !/not authorized/i.test(status.textContent);
+  }
+}
+
 updateAvatar();
 refreshAreaPill();
 document.getElementById("navScrim").onclick = closeNav;
@@ -1315,7 +1401,7 @@ document.getElementById("navSignout").onclick = () => { Auth.logout(); show("hom
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNav(); });
 ensureBurgers();
 document.getElementById("privacyBackBtn").onclick = () => show(privacyFrom);
-show("home");
+show(location.pathname === "/admin" || location.pathname === "/admin/" ? "admin" : "home");
 pollNotifications(false);
 window.addEventListener("focus", () => pollNotifications(true));
 try {

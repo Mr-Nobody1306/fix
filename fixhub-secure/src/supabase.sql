@@ -9,6 +9,9 @@ create table if not exists public.profiles (
   area text,
   rating numeric(3,2) not null default 5.00 check (rating between 0 and 5),
   jobs integer not null default 0 check (jobs >= 0),
+  is_suspended boolean not null default false,
+  suspension_reason text,
+  suspended_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -84,6 +87,11 @@ create policy profiles_authenticated_directory
   on public.profiles for select to authenticated
   using (true);
 
+drop policy if exists profiles_active_artisan_directory on public.profiles;
+create policy profiles_active_artisan_directory
+  on public.profiles as restrictive for select to authenticated
+  using (id = auth.uid() or role <> 'artisan' or is_suspended = false);
+
 drop policy if exists profiles_insert_self on public.profiles;
 create policy profiles_insert_self
   on public.profiles for insert to authenticated
@@ -109,6 +117,7 @@ create policy bookings_participant_or_matching_artisan_select
         and (p.role = 'admin' or (
           status = 'open'
           and p.role = 'artisan'
+          and p.is_suspended = false
           and lower(btrim(coalesce(p.trade, ''))) = lower(btrim(coalesce(service, '')))
         ))
     )
@@ -152,6 +161,7 @@ create policy applications_matching_artisan_insert
       join public.bookings b on b.id = applications.booking_id
       where p.id = auth.uid()
         and p.role = 'artisan'
+        and p.is_suspended = false
         and p.trade = applications.trade
         and p.name = applications.artisan_name
         and p.rating = applications.rating
@@ -179,5 +189,12 @@ create policy applications_customer_decision_update
       select 1 from public.bookings b
       where b.id = applications.booking_id
         and (b.owner_id = auth.uid() or b.customer_id = auth.uid())
+    )
+    and (
+      status <> 'accepted'
+      or exists (
+        select 1 from public.profiles p
+        where p.id = applications.artisan_id and p.is_suspended = false
+      )
     )
   );

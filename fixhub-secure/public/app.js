@@ -95,7 +95,10 @@ const Auth = {
   persist(s) { this.mem = s; try { localStorage.setItem(this.key, JSON.stringify(s)); } catch (e) {} },
   uid() { const s = this.load(); return s && s.uid ? s.uid : null; },
   googleUid() { const s = this.load(); return s && s.provider === "google" && s.uid ? s.uid : null; },
-  topUrl() { try { return location.origin + location.pathname; } catch (e) { return ""; } },
+  topUrl() {
+    try { return location.origin + (location.pathname === "/admin" || location.pathname === "/admin/" ? "/" : location.pathname); }
+    catch (e) { return ""; }
+  },
   async fetchUser() {
     const s = this.load();
     if (!s || !s.access || s.uid) return s;
@@ -135,13 +138,13 @@ const Auth = {
           const profile = await ensureProfile();
           if (!profile) {
             toast("Signed in, but your profile could not load. Check the database setup and try again.");
-            show("account");
+            show(location.pathname === "/admin" || location.pathname === "/admin/" ? "admin" : "account");
             return;
           }
           toast(profile.phoneStorageError
             ? "Welcome — your profile loaded, but phone details could not sync. Check the database migration."
             : "Welcome" + (profile.name ? ", " + String(profile.name).split(" ")[0] : "") + "!");
-          show("account");
+          show(location.pathname === "/admin" || location.pathname === "/admin/" ? "admin" : "account");
         }
       } catch (e) {}
       if (tries > 120) {
@@ -277,6 +280,7 @@ const Backend = {
   async openJobs() {
     if (!LIVE_DB) return [];
     const artisan = S.profile && S.profile.role === "artisan";
+    if (artisan && S.profile.isSuspended) return [];
     const trade = artisan ? String(S.profile.trade || "") : "";
     if (artisan && !trade) return [];
     try {
@@ -295,14 +299,16 @@ const Backend = {
   async artisans() {
     if (!LIVE_DB) return [];
     try {
-      const rows = await this.sbGet("profiles?select=id,role,name,trade,area,rating,jobs&role=eq.artisan&order=rating.desc&limit=50");
+      const rows = await this.sbGet("profiles?select=id,role,name,trade,area,rating,jobs&role=eq.artisan&is_suspended=eq.false&order=rating.desc&limit=50");
       return (rows || []).map(rowToProfile);
     } catch (e) { return []; }
   },
   async apply(booking) {
     const g = Auth.googleUid();
-    if (!g || !S.profile || S.profile.role !== "artisan" || !booking || booking.serviceId !== S.profile.trade || booking.status !== "open") {
-      throw new Error("This request is not open for your trade.");
+    if (!g || !S.profile || S.profile.role !== "artisan" || S.profile.isSuspended || !booking || booking.serviceId !== S.profile.trade || booking.status !== "open") {
+      throw new Error(S.profile && S.profile.isSuspended
+        ? "Your artisan account is suspended from new jobs."
+        : "This request is not open for your trade.");
     }
     if (!LIVE_DB) throw 0;
     return await this.sbSend("applications", "POST", {
@@ -365,7 +371,7 @@ function rowToBooking(r) {
   return { id: r.id, customerId: r.customer_id || null, artisanId: r.artisan_id || null, serviceId: r.service, desc: r.description, area: r.area, slot: r.slot, date: r.date, total: Number(r.total), service: r.service_amount == null ? null : Number(r.service_amount), transport: r.transport_amount == null ? null : Number(r.transport_amount), discount: r.discount_amount == null ? null : Number(r.discount_amount), payRef: r.payment_reference || null, method: r.method, status: r.status, tech: r.tech, prog: (r.prog != null ? Number(r.prog) : null), offRoute: !!r.offroute, techRating: (r.tech_rating != null ? Number(r.tech_rating) : null), techJobs: (r.tech_jobs != null ? Number(r.tech_jobs) : null) };
 }
 function rowToProfile(r) {
-  return { id: r.id, role: r.role, name: r.name, trade: r.trade || null, area: r.area || null, rating: (r.rating != null ? Number(r.rating) : 5.0), jobs: (r.jobs != null ? Number(r.jobs) : 0) };
+  return { id: r.id, role: r.role, name: r.name, trade: r.trade || null, area: r.area || null, rating: (r.rating != null ? Number(r.rating) : 5.0), jobs: (r.jobs != null ? Number(r.jobs) : 0), isSuspended: !!r.is_suspended, suspensionReason: r.suspension_reason || null, suspendedAt: r.suspended_at || null };
 }
 async function ensureProfile() {
   if (!LIVE_DB) return null;
@@ -446,14 +452,14 @@ async function ensureProfile() {
 })();
 
 /* ---------- tiny router ---------- */
-const VIEWS = ["home", "diag", "services", "account", "privacy", "book1", "book2", "track", "pay", "history"];
+const VIEWS = ["home", "diag", "services", "account", "privacy", "book1", "book2", "track", "pay", "history", "admin"];
 let privacyFrom = "account";
 function requireSignedInForProtectedView(name) {
-  const protectedViews = ["services", "book1", "book2", "track", "pay", "history"];
+  const protectedViews = ["services", "book1", "book2", "track", "pay", "history", "admin"];
   if (!protectedViews.includes(name)) return true;
   const signedIn = !!(Auth && typeof Auth.googleUid === "function" && Auth.googleUid()) && !!(S && S.profile);
   if (!signedIn) {
-    toast("Please sign in with Google before accessing services and bookings.");
+    toast(name === "admin" ? "Sign in with the authorized Google account to open the admin portal." : "Please sign in with Google before accessing services and bookings.");
     if (name !== "account") show("account");
     return false;
   }
@@ -478,6 +484,7 @@ function show(name) {
   if (name === "track") renderTrack();
   if (name === "history") renderHistory();
   if (name === "pay") renderPay();
+  if (name === "admin" && typeof renderAdmin === "function") renderAdmin();
 }
 /* ---------- side navigation (drawer on phones, fixed sidebar on desktop) ---------- */
 function openNav() {
@@ -780,7 +787,11 @@ async function renderJobs(silent) {
     });
   }
   box.innerHTML = "";
-  if (!jobs.length) box.innerHTML = '<p class="f14 soft glasscard p-4">No open requests right now. New customer jobs appear here — check back soon.</p>';
+  if (!jobs.length) {
+    box.innerHTML = S.profile && S.profile.isSuspended
+      ? '<div class="glasscard p-4" role="status"><p class="font-display font-bold f15">Your artisan profile is suspended</p><p class="f13 soft mt-1">You cannot see or apply for new jobs. Existing accepted jobs remain available.</p></div>'
+      : '<p class="f14 soft glasscard p-4">No open requests right now. New customer jobs appear here — check back soon.</p>';
+  }
   jobs.slice(0, 20).forEach(j => {
     const s = svc(j.serviceId) || { name: j.serviceId, tint: "#F1F5F9", color: "#4A5268", icon: "" };
     const el = document.createElement("div");
@@ -802,7 +813,7 @@ async function applyForJob(j) {
   try {
     await Backend.apply(j);
     toast("Application sent — the customer will review it");
-  } catch (e) { toast("Could not apply — you may have already applied"); }
+  } catch (e) { toast(e.message || "Could not apply — you may have already applied"); }
 }
 
 function renderUpcoming() {
