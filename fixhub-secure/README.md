@@ -83,6 +83,8 @@ Currency and artisan accounts:
 - Artisans see only open requests matching their saved trade. Customers and
   artisans receive persistent in-app notifications for applications, job
   updates, payment confirmation, and payouts.
+- Visible signed-in sessions refresh matching jobs and notifications every
+  five seconds. New updates appear in an in-app popup without reloading.
 - The public app has no administrator dashboard or admin route. Administrative
   database access remains limited to privileged Supabase/server credentials.
 - Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,

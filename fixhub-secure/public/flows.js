@@ -610,35 +610,58 @@ function renderNotifications() {
   });
 }
 const knownNotificationIds = new Set();
+let notificationSnapshotLoaded = false;
+let notificationPollInFlight = false;
+const NOTIFICATION_POLL_INTERVAL = 5000;
 async function pollNotifications(showNew) {
-  if (!LIVE_DB || !Auth.googleUid()) return;
+  if (!LIVE_DB || !Auth.googleUid() || notificationPollInFlight) return;
+  notificationPollInFlight = true;
   try {
-    const notifications = await Backend.notifications();
-    const fresh = notifications.filter((notification) => !knownNotificationIds.has(String(notification.id)));
-    notifications.forEach((notification) => knownNotificationIds.add(String(notification.id)));
-    APP_NOTIFICATIONS = notifications;
-    updateNotificationBadge();
+    try {
+      const notifications = await Backend.notifications();
+      const fresh = notificationSnapshotLoaded
+        ? notifications.filter((notification) => !knownNotificationIds.has(String(notification.id)))
+        : [];
+      notifications.forEach((notification) => knownNotificationIds.add(String(notification.id)));
+      notificationSnapshotLoaded = true;
+      APP_NOTIFICATIONS = notifications;
+      updateNotificationBadge();
+      if (showNew) fresh.filter((notification) => !notification.read_at)
+        .forEach((notification) => toast(notification.message));
+      if (!document.getElementById("view-history").hidden) renderNotifications();
+    } catch (error) {
+      console.error("[notifications] Could not refresh:", error.message);
+    }
     if (S.profile && S.profile.role === "customer") {
       const bookings = await Backend.list();
+      const bookingsChanged = JSON.stringify(S.bookings) !== JSON.stringify(bookings);
       S.bookings = bookings;
       persist();
       if (!document.getElementById("view-track").hidden) renderTrack();
       if (!document.getElementById("view-home").hidden) renderHomeExtras();
+      if (!document.getElementById("view-history").hidden) {
+        if (bookingsChanged) await renderHistory(bookings);
+        else renderNotifications();
+      }
     } else if (S.profile && S.profile.role === "artisan" && !document.getElementById("view-home").hidden) {
-      renderJobs();
+      await renderJobs(true);
     }
-    if (showNew) fresh.filter((notification) => !notification.read_at).forEach((notification) => toast(notification.message));
-    if (!document.getElementById("view-history").hidden) renderNotifications();
   } catch (error) {
-    console.error("[notifications] Could not refresh:", error.message);
+    console.error("[live updates] Could not refresh:", error.message);
+  } finally {
+    notificationPollInFlight = false;
   }
 }
-setInterval(() => pollNotifications(true), 20000);
-async function renderHistory() {
+setInterval(() => {
+  if (document.visibilityState === "visible") pollNotifications(true);
+}, NOTIFICATION_POLL_INTERVAL);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") pollNotifications(true);
+});
+async function renderHistory(bookings) {
   document.getElementById("backendChip").textContent = LIVE_DB ? "Live Supabase" : "Not connected";
   document.getElementById("histSub").textContent = LIVE_DB ? "Synced jobs" : "Add keys in public/config.js to connect";
-  const all = await Backend.list();
-  await pollNotifications(false);
+  const all = Array.isArray(bookings) ? bookings : await Backend.list();
   renderNotifications();
   const a = all.find(b => b.id === S.activeId && ["dispatched", "enroute", "arrived", "working"].includes(b.status));
   const box = document.getElementById("activeJobCard");

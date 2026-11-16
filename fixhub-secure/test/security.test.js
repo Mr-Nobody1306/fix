@@ -154,7 +154,7 @@ describe("currency and artisan profile behavior", function () {
     const app = read("public/app.js");
     const schema = read("src/artisan-private-details.sql");
     assert.match(app, /notifications\?select=id,booking_id,type,message,read_at,created_at/);
-    assert.match(flows, /setInterval\(\(\) => pollNotifications\(true\), 20000\)/);
+    assert.match(flows, /const NOTIFICATION_POLL_INTERVAL = 5000;/);
     assert.match(schema, /notifications_recipient_select/);
     assert.match(schema, /servepoint_application_notifications/);
     assert.match(schema, /servepoint_open_booking_notifications/);
@@ -251,6 +251,20 @@ describe("no inline styles (CSP style-src has no unsafe-inline)", function () {
     assert.match(app, /if \(!VIEWS\.includes\(name\)\) name = "home";/);
     assert.match(html, /<footer class="sp-footer">/);
     assert.match(html, /Get support · 0800 349 548/);
+  });
+  it("refreshes live data and shows CSP-safe notification popups", function () {
+    const app = read("public/app.js");
+    const flows = read("public/flows.js");
+    const html = read("public/index.html");
+    const styles = read("public/styles.css");
+    assert.match(flows, /const NOTIFICATION_POLL_INTERVAL = 5000;/);
+    assert.match(flows, /notificationPollInFlight/);
+    assert.match(flows, /document\.visibilityState === "visible"/);
+    assert.match(flows, /renderJobs\(true\)/);
+    assert.match(app, /t\.classList\.add\("toast-visible"\)/);
+    assert.doesNotMatch(app, /t\.style\.opacity/);
+    assert.match(html, /role="status" aria-live="polite"/);
+    assert.match(styles, /#toast\.toast-visible/);
   });
   it("bottom tab bar is gone; side navigation owns all routing", function () {
     for (const f of ["public/index.html", "public/app.js", "public/flows.js"]) {

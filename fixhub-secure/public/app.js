@@ -531,13 +531,28 @@ document.addEventListener("click", (e) => {
 });
 
 /* ---------- toast ---------- */
-let toastT = null;
+let toastT = null, toastQueue = [], toastShowing = false;
 function toast(msg) {
   const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.style.opacity = "1";
-  clearTimeout(toastT);
-  toastT = setTimeout(() => { t.style.opacity = "0"; }, 2600);
+  if (!t || !msg) return;
+  toastQueue.push(String(msg));
+  if (toastShowing) return;
+  showNextToast();
+}
+function showNextToast() {
+  const t = document.getElementById("toast");
+  const message = toastQueue.shift();
+  if (!t || !message) { toastShowing = false; return; }
+  toastShowing = true;
+  t.textContent = message;
+  t.classList.add("toast-visible");
+  toastT = setTimeout(() => {
+    t.classList.remove("toast-visible");
+    toastT = setTimeout(() => {
+      toastT = null;
+      showNextToast();
+    }, 180);
+  }, 3800);
 }
 
 /* ---------- home: categories, search, senior mode ---------- */
@@ -719,16 +734,25 @@ function renderHomeExtras() {
   }
   renderUpcoming();
 }
-async function renderJobs() {
+let liveJobsSignature = null;
+async function renderJobs(silent) {
   const box = document.getElementById("jobsList");
   const assignedBox = document.getElementById("assignedJobsList");
   if (!box) return;
   if (!LIVE_DB) { box.innerHTML = '<div class="glasscard p-4"><p class="font-display font-bold f15">Backend not connected</p><p class="f13 soft mt-1">Open requests appear here once you add your Supabase URL + anon key in public/config.js and reload.</p></div>'; return; }
-  if (assignedBox) assignedBox.innerHTML = '<p class="f13 soft">Loading your accepted requests…</p>';
-  box.innerHTML = '<p class="f14 soft">Finding open requests…</p>';
+  if (!silent || liveJobsSignature === null) {
+    if (assignedBox) assignedBox.innerHTML = '<p class="f13 soft">Loading your accepted requests…</p>';
+    box.innerHTML = '<p class="f14 soft">Finding open requests…</p>';
+  }
   let jobs = [], assigned = [];
   try { jobs = await Backend.openJobs(); } catch (e) { jobs = []; }
   try { assigned = await Backend.assignedJobs(); } catch (e) { assigned = []; }
+  const signature = JSON.stringify([
+    jobs.map((job) => [job.id, job.status, job.serviceId, job.area, job.date, job.slot, job.total, job.desc]),
+    assigned.map((job) => [job.id, job.status, job.serviceId, job.area, job.date, job.slot])
+  ]);
+  if (silent && signature === liveJobsSignature) return;
+  liveJobsSignature = signature;
   if (assignedBox) {
     assignedBox.innerHTML = "";
     if (!assigned.length) assignedBox.innerHTML = '<p class="f13 soft">No accepted requests yet.</p>';
