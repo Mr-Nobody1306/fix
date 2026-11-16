@@ -83,6 +83,8 @@ Currency and artisan accounts:
 - Artisans see only open requests matching their saved trade. Customers and
   artisans receive persistent in-app notifications for applications, job
   updates, payment confirmation, and payouts.
+- The public app has no administrator dashboard or admin route. Administrative
+  database access remains limited to privileged Supabase/server credentials.
 - Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
   and `PAYSTACK_SECRET_KEY` in the server `.env` or host environment. Never put
   the service-role or Paystack secret keys in `public/config.js`.

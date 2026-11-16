@@ -1292,8 +1292,6 @@ document.getElementById("navSignout").onclick = () => { Auth.logout(); show("hom
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNav(); });
 ensureBurgers();
 document.getElementById("privacyBackBtn").onclick = () => show(privacyFrom);
-const aso = document.getElementById("adminSignout");
-if (aso) aso.onclick = () => { Auth.logout(); show("home"); };
 show("home");
 pollNotifications(false);
 window.addEventListener("focus", () => pollNotifications(true));

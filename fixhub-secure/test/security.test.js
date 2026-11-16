@@ -243,6 +243,15 @@ describe("no inline styles (CSP style-src has no unsafe-inline)", function () {
     assert.ok(html.indexOf("https://js.paystack.co/v1/inline.js") !== -1, "paystack script stays pinned in script-src");
     assert.ok(html.indexOf("Access-Control-Allow-Origin") !== -1, "the no-SRI reason must be written down next to the script tag");
   });
+  it("removes the public admin dashboard and adds a home footer", function () {
+    const html = read("public/index.html");
+    const app = read("public/app.js");
+    assert.doesNotMatch(html, /view-admin|data-goto="admin"|Administration/);
+    assert.doesNotMatch(app, /renderAdmin|adminTab/);
+    assert.match(app, /if \(!VIEWS\.includes\(name\)\) name = "home";/);
+    assert.match(html, /<footer class="sp-footer">/);
+    assert.match(html, /Get support · 0800 349 548/);
+  });
   it("bottom tab bar is gone; side navigation owns all routing", function () {
     for (const f of ["public/index.html", "public/app.js", "public/flows.js"]) {
       const body = read(f);
@@ -255,7 +264,7 @@ describe("no inline styles (CSP style-src has no unsafe-inline)", function () {
     assert.match(read("public/styles.css"), /\[data-view\]\[hidden\]\s*\{\s*display:\s*none\s*!important;/, "inactive views must remain hidden even when they have custom display styles");
     assert.ok(html.indexOf('id="catGrid" class="sp-homegrid"') !== -1, "home service cards must use the wide-card grid");
     assert.ok(html.indexOf('id="homeSearch"') !== -1 && html.indexOf('id="homeLoc"') !== -1, "home search row required");
-    for (const v of ["home", "services", "history", "diag", "account", "privacy", "admin"]) {
+    for (const v of ["home", "services", "history", "diag", "account", "privacy"]) {
       assert.ok(html.indexOf('data-goto="' + v + '"') !== -1, "drawer link missing: " + v);
     }
     const app = read("public/app.js");

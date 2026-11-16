@@ -446,7 +446,7 @@ async function ensureProfile() {
 })();
 
 /* ---------- tiny router ---------- */
-const VIEWS = ["home", "diag", "services", "account", "privacy", "book1", "book2", "track", "pay", "history", "admin"];
+const VIEWS = ["home", "diag", "services", "account", "privacy", "book1", "book2", "track", "pay", "history"];
 let privacyFrom = "account";
 function requireSignedInForProtectedView(name) {
   const protectedViews = ["services", "book1", "book2", "track", "pay", "history"];
@@ -460,12 +460,10 @@ function requireSignedInForProtectedView(name) {
   return true;
 }
 function show(name) {
+  if (!VIEWS.includes(name)) name = "home";
   if (!requireSignedInForProtectedView(name)) return;
   VIEWS.forEach(v => { const el = document.getElementById("view-" + v); if (el) el.hidden = (v !== name); });
   closeNav();
-  const appEl = document.getElementById("app");
-  if (appEl) appEl.classList.toggle("wide", name === "admin");
-  document.body.classList.toggle("on-admin", name === "admin");
   document.querySelectorAll(".sn-link").forEach(b => {
     const on = b.dataset.goto === name || ((name === "book1" || name === "book2") && b.dataset.goto === "home") || ((name === "track" || name === "pay") && b.dataset.goto === "history");
     b.classList.toggle("on", !!on);
@@ -480,7 +478,6 @@ function show(name) {
   if (name === "track") renderTrack();
   if (name === "history") renderHistory();
   if (name === "pay") renderPay();
-  if (name === "admin") renderAdmin();
 }
 /* ---------- side navigation (drawer on phones, fixed sidebar on desktop) ---------- */
 function openNav() {
@@ -784,142 +781,6 @@ async function applyForJob(j) {
   } catch (e) { toast("Could not apply — you may have already applied"); }
 }
 
-/* ---------- admin dashboard (ServePoint: providers, customers, categories) ---------- */
-let adminTab = "overview";
-function adminFmtDate(iso) { try { return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } catch (e) { return ""; } }
-function adminInitial(name) { const s = String(name || "S").trim(); return (s[0] || "S").toUpperCase(); }
-function setAdminTab(t) { adminTab = t; renderAdmin(); }
-function adminStatusPill(st) {
-  if (st === "accepted") return '<span class="sp-pill sp-pill-green">Approved</span>';
-  if (st === "declined" || st === "withdrawn") return '<span class="sp-pill sp-pill-gray">Declined</span>';
-  return '<span class="sp-pill sp-pill-amber">Awaiting review</span>';
-}
-async function approveApplication(id) {
-  if (!LIVE_DB) { toast("Backend not connected yet — add your Supabase keys in public/config.js"); return; }
-  try { await Backend.setApplication(id, "accepted"); toast("Approved — the artisan can start"); }
-  catch (e) { toast("Could not approve — check your connection"); }
-  renderAdmin();
-}
-async function suspendApplication(id) {
-  if (!LIVE_DB) { toast("Backend not connected yet — add your Supabase keys in public/config.js"); return; }
-  try { await Backend.setApplication(id, "declined"); toast("Application suspended"); }
-  catch (e) { toast("Could not suspend — check your connection"); }
-  renderAdmin();
-}
-function adminSetupCard(msg) {
-  return `<div class="sp-card"><p class="sp-card-title">Backend not connected</p>
-    <p class="f13 sp-soft mt-1">${msg || "Add your Supabase URL + anon key in public/config.js and sign in with Google to see live numbers here."}</p></div>`;
-}
-async function renderAdmin() {
-  const g = Auth.googleUid();
-  try { document.getElementById("adminDate").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); } catch (e) {}
-  const roleEl = document.getElementById("adminRole");
-  if (roleEl) roleEl.textContent = (S.profile && g) ? "Admin" : "Guest";
-  const av = document.getElementById("adminAvatar");
-  if (av) av.textContent = adminInitial(S.profile && S.profile.name);
-  document.querySelectorAll("#adminTabs button").forEach(b => b.classList.toggle("on", b.dataset.atab === adminTab));
-  const crumb = document.getElementById("adminCrumb");
-  if (crumb) crumb.textContent = { overview: "Overview", providers: "Providers", customers: "Customers", categories: "Categories & listings" }[adminTab] || "Overview";
-  const statsBox = document.getElementById("adminStats");
-  const content = document.getElementById("adminContent");
-  if (!statsBox || !content) return;
-  if (!LIVE_DB) {
-    statsBox.innerHTML = `<div class="sp-card sp-stat"><p class="sp-stat-num">–</p><p class="sp-stat-label">Live stats need keys</p></div>` + adminSetupCard();
-    content.innerHTML = adminSetupCard("Provider applications, artisans and bookings appear here once the backend is connected.");
-    return;
-  }
-  let open = [], artisans = [], mine = [];
-  try { open = await Backend.openJobs(); } catch (e) { open = []; }
-  try { artisans = await Backend.artisans(); } catch (e) { artisans = []; }
-  try { mine = await Backend.list(); } catch (e) { mine = []; }
-  let apps = [];
-  if (g && S.profile && S.profile.role !== "artisan") {
-    for (const b of mine.slice(0, 20)) {
-      try {
-        const rows = await Backend.applicants(b.id);
-        rows.forEach(a => { a._booking = b; apps.push(a); });
-      } catch (e) {}
-    }
-  }
-  const toReview = apps.filter(a => a.status === "pending").length;
-  statsBox.innerHTML =
-    `<div class="sp-card sp-stat"><p class="sp-stat-num">${open.length}</p><p class="sp-stat-label">Open requests</p></div>
-     <div class="sp-card sp-stat"><p class="sp-stat-num">${artisans.length}</p><p class="sp-stat-label">Registered artisans</p></div>
-     <div class="sp-card sp-stat"><p class="sp-stat-num">${toReview}</p><p class="sp-stat-label">Requires review</p></div>
-     <div class="sp-card sp-stat sp-stat-calm"><p class="sp-stat-msg">You're all caught up</p><p class="sp-stat-label">New updates will appear here.</p></div>`;
-  if (adminTab === "overview") {
-    if (!g) {
-      content.innerHTML = `<div class="sp-card"><p class="sp-card-title">Sign in to review applications</p>
-        <p class="f13 sp-soft mt-1">Provider applications on your job posts appear here once you sign in with Google.</p>
-        <button class="sp-btn-dark mt-3" data-goto="account">Sign in with Google</button></div>`;
-      return;
-    }
-    if (!apps.length) {
-      content.innerHTML = `<div class="sp-card"><p class="sp-card-title">Provider applications</p>
-        <p class="f13 sp-soft mt-1">No applications yet. Post a job from Home and artisan applications will appear here for review.</p></div>`;
-      return;
-    }
-    content.innerHTML = `<div class="sp-card sp-table-card">
-      <div class="sp-table-head"><div><p class="sp-card-title">Provider applications</p>
-      <p class="f12 sp-soft">Review new providers before they appear to customers.</p></div>
-      <span class="sp-pill sp-pill-amber">${toReview} to review</span></div>
-      <div class="sp-table">${apps.map(a => {
-        const b = a._booking || {};
-        const s = svc(b.serviceId) || { name: b.serviceId || a.trade || "" };
-        return `<div class="sp-row">
-          <div class="sp-cell-main"><b>${escapeHtml(a.artisan_name || "Artisan")}</b><i>${escapeHtml(s.name || "")} · ★ ${Number(a.rating || 5).toFixed(1)} · ${Number(a.jobs || 0)} jobs</i></div>
-          <div class="sp-cell"><span class="sp-th">Category</span>${escapeHtml(a.trade || s.name || "—")}</div>
-          <div class="sp-cell"><span class="sp-th">Date joined</span>${adminFmtDate(a.created_at)}</div>
-          <div class="sp-cell"><span class="sp-th">Status</span>${adminStatusPill(a.status)}</div>
-          <div class="sp-cell sp-cell-act"><span class="sp-th">Action</span><span class="sp-actions">
-            ${a.status === "pending" ? `<button class="sp-approve" data-app-ok="${a.id}">✓ Approve</button>` : ""}
-            ${a.status !== "declined" ? `<button class="sp-suspend" data-app-no="${a.id}">Suspend</button>` : '<span class="f12 sp-soft">—</span>'}
-          </span></div>
-        </div>`;
-      }).join("")}</div></div>`;
-    content.querySelectorAll("[data-app-ok]").forEach(b => { b.onclick = (event) => withButtonBusy(event.currentTarget, "Approving…", () => approveApplication(b.dataset.appOk)); });
-    content.querySelectorAll("[data-app-no]").forEach(b => { b.onclick = (event) => withButtonBusy(event.currentTarget, "Updating…", () => suspendApplication(b.dataset.appNo)); });
-  } else if (adminTab === "providers") {
-    content.innerHTML = artisans.length ? `<div class="sp-card sp-table-card">
-      <div class="sp-table-head"><div><p class="sp-card-title">Providers</p>
-      <p class="f12 sp-soft">${artisans.length} verified artisan${artisans.length === 1 ? "" : "s"}, highest rated first.</p></div></div>
-      <div class="sp-table">${artisans.map((p, i) => `<div class="sp-row">
-        <div class="sp-cell-main"><b>${escapeHtml(p.name || "Artisan")}${i === 0 ? ' <span class="sp-star">★ Top rated</span>' : ""}</b><i>${escapeHtml(p.area || "")}</i></div>
-        <div class="sp-cell"><span class="sp-th">Trade</span>${escapeHtml(p.trade || "—")}</div>
-        <div class="sp-cell"><span class="sp-th">Rating</span>★ ${Number(p.rating || 5).toFixed(1)}</div>
-        <div class="sp-cell"><span class="sp-th">Jobs</span>${Number(p.jobs || 0)}</div>
-      </div>`).join("")}</div></div>`
-      : adminSetupCard(g ? "No artisans have joined yet. Artisans appear here once they sign in and save a trade." : undefined);
-  } else if (adminTab === "customers") {
-    content.innerHTML = mine.length ? `<div class="sp-card sp-table-card">
-      <div class="sp-table-head"><div><p class="sp-card-title">Customers</p>
-      <p class="f12 sp-soft">Bookings on this device${g ? " and your account" : ""}.</p></div></div>
-      <div class="sp-table">${mine.slice(0, 30).map(b => {
-        const s = svc(b.serviceId) || { name: b.serviceId };
-        return `<div class="sp-row">
-          <div class="sp-cell-main"><b>${escapeHtml(b.id)}</b><i>${escapeHtml(b.area || "")}</i></div>
-          <div class="sp-cell"><span class="sp-th">Service</span>${escapeHtml(s.name || "")}</div>
-          <div class="sp-cell"><span class="sp-th">Date</span>${escapeHtml(b.date || "")}</div>
-          <div class="sp-cell"><span class="sp-th">Status</span>${adminStatusPill(b.status === "open" ? "pending" : (["paid", "completed"].includes(b.status) ? "accepted" : "pending"))}<span class="f12 sp-soft"> ${escapeHtml(b.status)}</span></div>
-          <div class="sp-cell"><span class="sp-th">Total</span>${gh(Number(b.total || 0))}</div>
-        </div>`;
-      }).join("")}</div></div>`
-      : adminSetupCard("No bookings yet. New customer bookings will appear here.");
-  } else {
-    content.innerHTML = `<div class="sp-card sp-table-card">
-      <div class="sp-table-head"><div><p class="sp-card-title">Categories & listings</p>
-      <p class="f12 sp-soft">5 trades, live open counts.</p></div></div>
-      <div class="sp-table">${SERVICES.map(s => {
-        const n = open.filter(j => j.serviceId === s.id).length;
-        return `<div class="sp-row">
-          <div class="sp-cell-main sp-catcell"><span class="sp-caticon ${tintCls(s)}">${svcIcon(s, "w-5 h-5")}</span><span><b>${s.name}</b><i>from ${gh(s.base)}</i></span></div>
-          <div class="sp-cell"><span class="sp-th">Open listings</span>${n}</div>
-          <div class="sp-cell"><span class="sp-th">Action</span><button class="sp-suspend" data-cat="${s.id}">New booking</button></div>
-        </div>`;
-      }).join("")}</div></div>`;
-    content.querySelectorAll("[data-cat]").forEach(b => { b.onclick = () => startBooking(b.dataset.cat); });
-  }
-}
 function renderUpcoming() {
   const wrap = document.getElementById("upcomingWrap"), box = document.getElementById("upcomingCard");
   if (!wrap || !box) return;
