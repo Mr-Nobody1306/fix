@@ -221,6 +221,16 @@ describe("hardened response headers", function () {
     assert.ok(!/"Access-Control-Allow-Origin"\s*:/.test(body), "same-origin API: no CORS headers anywhere");
     assert.ok(!/"Access-Control-Allow-Origin"\s*:/.test(read("server.js")), "server.js must not add CORS headers");
   });
+  it("allows OpenStreetMap tiles for the private live GPS map", function () {
+    const body = read("src/static.js");
+    const html = read("public/index.html");
+    const flows = read("public/flows.js");
+    assert.match(body, /img-src[^;]*https:\/\/tile\.openstreetmap\.org/);
+    assert.match(html, /© OpenStreetMap contributors/);
+    assert.match(html, /location is also sent to OpenStreetMap tile servers/);
+    assert.match(flows, /https:\/\/tile\.openstreetmap\.org\//);
+    assert.doesNotMatch(html + flows, /gpsCoordinates|latitude\.toFixed|longitude\.toFixed/);
+  });
   it("style-src is locked down: no unsafe-inline, no data:, no wildcards", function () {
     const body = read("src/static.js");
     const m = body.match(/style-src ([^;"]*)/);

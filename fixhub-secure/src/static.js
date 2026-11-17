@@ -28,7 +28,7 @@ function contentSecurityPolicy() {
     + " style-src 'self' https://fonts.googleapis.com https://paystack.com;"
     + " style-src-attr 'unsafe-inline';"
     + " font-src 'self' https://fonts.gstatic.com;"
-    + " img-src 'self' data: blob:;"
+    + " img-src 'self' data: blob: https://tile.openstreetmap.org;"
     + " media-src 'self' blob:;"
     + " connect-src 'self' https://*.supabase.co https://api.bigdatacloud.net https://get.geojs.io https://js.paystack.co https://api.paystack.co;"
     + " frame-src 'self' https://js.paystack.co https://checkout.paystack.com;"

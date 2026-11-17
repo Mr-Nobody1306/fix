@@ -222,6 +222,104 @@ const Track = {
   }
 };
 const acceptedArtisanContacts = new Map();
+const GPS_MAP_MIN_ZOOM = 13;
+const GPS_MAP_MAX_ZOOM = 19;
+const gpsMapTileCache = new Map();
+function gpsMapWorldPoint(latitude, longitude, zoom) {
+  const scale = 256 * Math.pow(2, zoom);
+  const lat = Math.max(-85.05112878, Math.min(85.05112878, latitude)) * Math.PI / 180;
+  return {
+    x: Math.max(0, Math.min(scale - 1, (longitude + 180) / 360 * scale)),
+    y: Math.max(0, Math.min(scale - 1, (1 - Math.asinh(Math.tan(lat)) / Math.PI) / 2 * scale))
+  };
+}
+function renderGpsMap(booking, latitude, longitude) {
+  const map = document.getElementById("gpsMap");
+  const canvas = document.getElementById("gpsMapCanvas");
+  const link = document.getElementById("gpsMapLink");
+  const status = document.getElementById("gpsMapStatus");
+  const zoomIn = document.getElementById("gpsZoomIn");
+  const zoomOut = document.getElementById("gpsZoomOut");
+  if (!map || !canvas || !link || !status || !zoomIn || !zoomOut) return;
+  const zoom = Math.max(GPS_MAP_MIN_ZOOM, Math.min(GPS_MAP_MAX_ZOOM, Number(booking._gpsZoom) || 16));
+  booking._gpsZoom = zoom;
+  const tileCount = Math.pow(2, zoom);
+  const point = gpsMapWorldPoint(latitude, longitude, zoom);
+  const tileX = Math.floor(point.x / 256);
+  const tileY = Math.floor(point.y / 256);
+  map.hidden = false;
+  const width = map.clientWidth;
+  const height = map.clientHeight;
+  if (!width || !height) return;
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(width * pixelRatio);
+  canvas.height = Math.round(height * pixelRatio);
+  const context = canvas.getContext("2d");
+  if (!context) {
+    status.hidden = false;
+    status.textContent = "This browser cannot display the map. You can open the map directly.";
+    return;
+  }
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  const renderVersion = (booking._gpsMapRenderVersion || 0) + 1;
+  booking._gpsMapRenderVersion = renderVersion;
+  let loadedTiles = 0;
+  let failedTiles = 0;
+  const drawTiles = () => {
+    if (booking._gpsMapRenderVersion !== renderVersion) return;
+    context.fillStyle = "#E9EDF4";
+    context.fillRect(0, 0, width, height);
+    loadedTiles = 0;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = tileX + dx;
+        const y = tileY + dy;
+        if (x < 0 || x >= tileCount || y < 0 || y >= tileCount) continue;
+        const key = zoom + "/" + x + "/" + y;
+        let tile = gpsMapTileCache.get(key);
+        if (!tile) {
+          tile = new Image();
+          tile.referrerPolicy = "origin";
+          tile.onload = () => {
+            if (typeof booking._gpsMapDrawTiles === "function") booking._gpsMapDrawTiles();
+          };
+          tile.onerror = () => {
+            tile.gpsMapFailed = true;
+            if (typeof booking._gpsMapDrawTiles === "function") booking._gpsMapDrawTiles();
+          };
+          gpsMapTileCache.set(key, tile);
+          tile.src = "https://tile.openstreetmap.org/" + key + ".png";
+          while (gpsMapTileCache.size > 40) gpsMapTileCache.delete(gpsMapTileCache.keys().next().value);
+        }
+        if (tile.gpsMapFailed) {
+          failedTiles++;
+          continue;
+        }
+        if (tile.complete && tile.naturalWidth) {
+          loadedTiles++;
+          const offsetX = width / 2 - (point.x - (tileX + dx) * 256);
+          const offsetY = height / 2 - (point.y - (tileY + dy) * 256);
+          context.drawImage(tile, offsetX, offsetY, 256, 256);
+        }
+      }
+    }
+    if (loadedTiles) {
+      status.hidden = failedTiles === 0;
+      if (failedTiles) status.textContent = "Some map tiles could not be loaded. You can open the map directly.";
+    } else if (!failedTiles) {
+      status.hidden = false;
+      status.textContent = "Loading map…";
+    }
+  };
+  booking._gpsMapDrawTiles = drawTiles;
+  drawTiles();
+  link.href = "https://www.openstreetmap.org/?mlat=" + latitude + "&mlon=" + longitude + "#map=" + zoom + "/" + latitude + "/" + longitude;
+  link.hidden = false;
+  zoomIn.disabled = zoom >= GPS_MAP_MAX_ZOOM;
+  zoomOut.disabled = zoom <= GPS_MAP_MIN_ZOOM;
+  zoomIn.onclick = () => { booking._gpsZoom = zoom + 1; renderLiveGps(booking); };
+  zoomOut.onclick = () => { booking._gpsZoom = zoom - 1; renderLiveGps(booking); };
+}
 function isCurrentBookingCustomer(booking) {
   const userId = Auth.googleUid();
   return !!(booking && userId && (booking.customerId === userId || booking.ownerId === userId));
@@ -243,16 +341,20 @@ function acceptedArtisanContact(booking) {
 function renderLiveGps(booking) {
   const card = document.getElementById("liveGpsCard");
   const state = document.getElementById("gpsShareState");
-  const coordinates = document.getElementById("gpsCoordinates");
   const updatedAt = document.getElementById("gpsUpdatedAt");
-  if (!card || !state || !coordinates || !updatedAt) return;
+  const map = document.getElementById("gpsMap");
+  const mapLink = document.getElementById("gpsMapLink");
+  const mapStatus = document.getElementById("gpsMapStatus");
+  if (!card || !state || !updatedAt || !map || !mapLink || !mapStatus) return;
   const canView = !!(booking.artisanId && isCurrentBookingCustomer(booking));
   card.hidden = !canView;
   if (!canView) return;
   const location = booking.liveLocation;
   if (!location) {
     state.textContent = "Waiting for the accepted artisan to share location.";
-    coordinates.hidden = true;
+    map.hidden = true;
+    mapLink.hidden = true;
+    mapStatus.hidden = true;
     updatedAt.textContent = "";
     document.getElementById("gpsMeta").textContent = "Waiting for artisan GPS";
     return;
@@ -269,9 +371,7 @@ function renderLiveGps(booking) {
   const freshness = ageSeconds < 30 ? "Updated just now" :
     ageSeconds < 60 ? "Updated less than a minute ago" : "Updated " + Math.floor(ageSeconds / 60) + " min ago";
   state.textContent = "The accepted artisan is sharing live location.";
-  coordinates.textContent = latitude.toFixed(5) + ", " + longitude.toFixed(5) +
-    (location.accuracy_m ? " · ±" + Math.round(Number(location.accuracy_m)) + " m" : "");
-  coordinates.hidden = false;
+  renderGpsMap(booking, latitude, longitude);
   updatedAt.textContent = freshness;
   document.getElementById("gpsMeta").textContent = "GPS " + freshness.toLowerCase();
 }

@@ -390,7 +390,14 @@ body { color: #1A2333; }
 .admin-metric { min-width: 0; }
 .admin-audit-row { border-top: 1px solid #E8ECF2; padding-top: 10px; overflow-wrap: anywhere; }
 .gps-pin { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: #EAF1FE; color: #1D4ED8; flex: none; }
-.gps-coordinates { color: #1D4ED8; overflow-wrap: anywhere; }
+.gps-map { position: relative; height: 280px; overflow: hidden; border-radius: 14px; background: #E9EDF4; isolation: isolate; }
+.gps-map-canvas { display: block; width: 100%; height: 100%; }
+.gps-map-marker { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; display: grid; place-items: center; border: 3px solid #fff; border-radius: 50% 50% 50% 0; background: #DC2626; box-shadow: 0 2px 6px rgba(15,23,42,.35); transform: translate(-50%, -70%) rotate(-45deg); }
+.gps-map-marker span { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+.gps-map-attribution { position: absolute; left: 6px; bottom: 6px; padding: 3px 5px; border-radius: 4px; background: rgba(255,255,255,.9); color: #334155; font-size: 10px; }
+.gps-map-controls { position: absolute; right: 10px; top: 10px; display: grid; gap: 6px; }
+.gps-map-controls button { width: 36px; height: 36px; border: 1px solid #CBD5E1; border-radius: 10px; background: #fff; color: #0F172A; box-shadow: 0 1px 4px rgba(15,23,42,.2); font-size: 22px; line-height: 1; font-weight: 700; }
+.gps-map-controls button:disabled { opacity: .5; }
 @media (min-width: 640px) {
   .sp-experience-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sp-artisan-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }

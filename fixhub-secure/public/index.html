@@ -336,9 +336,19 @@
               <p id="gpsShareState" class="f12 soft mt-1">Waiting for the accepted artisan to share location.</p>
             </div>
           </div>
-          <p id="gpsCoordinates" class="gps-coordinates f13 font-bold mt-3" hidden></p>
+          <div id="gpsMap" class="gps-map mt-3" hidden>
+            <canvas id="gpsMapCanvas" class="gps-map-canvas" role="img" aria-label="Map showing the accepted artisan's shared location"></canvas>
+            <span class="gps-map-marker" aria-hidden="true"><span></span></span>
+            <a class="gps-map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" referrerpolicy="origin">© OpenStreetMap contributors</a>
+            <div class="gps-map-controls" aria-label="Map zoom controls">
+              <button id="gpsZoomIn" type="button" aria-label="Zoom in">+</button>
+              <button id="gpsZoomOut" type="button" aria-label="Zoom out">−</button>
+            </div>
+          </div>
+          <p id="gpsMapStatus" class="f12 soft mt-2" role="status" hidden></p>
+          <p class="f11 mt-2"><a id="gpsMapLink" class="font-bold text-trust" href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer" referrerpolicy="origin" hidden>Open larger map</a></p>
           <p id="gpsUpdatedAt" class="f12 soft mt-1"></p>
-          <p class="f11 soft mt-2">Visible only to you for this active booking. The latest point is removed when sharing stops or the job ends.</p>
+          <p class="f11 soft mt-2">Your accepted artisan's shared location is visible to you and sent to OpenStreetMap to load map tiles. The latest point is removed when sharing stops or the job ends.</p>
         </section>
         <div id="trackStatusCard" class="bg-white border border-line rounded-2xl shadow-card p-4 track-status">
           <div class="flex items-center justify-between">
@@ -551,7 +561,7 @@
         </div>
         <div class="bg-white border border-line rounded-2xl shadow-card p-4">
           <p class="font-display font-bold f15">How it is stored</p>
-          <p class="f13 text-ink-soft mt-1">Bookings live in a secured Supabase database with row-level security: customers see their own bookings and applications, while artisans see matching open requests and their assigned jobs. Private artisan contact details are shown only to the customer after acceptance. Nobody can delete records through the app.</p>
+          <p class="f13 text-ink-soft mt-1">Bookings live in a secured Supabase database with row-level security: customers see their own bookings and applications, while artisans see matching open requests and their assigned jobs. Private artisan contact details are shown only to the customer after acceptance. When live tracking is enabled, the location is also sent to OpenStreetMap tile servers to display the map. Nobody can delete records through the app.</p>
         </div>
         <div class="bg-white border border-line rounded-2xl shadow-card p-4">
           <p class="font-display font-bold f15">Payments</p>

@@ -89,7 +89,9 @@ Currency and artisan accounts:
   updates, payment confirmation, and payouts.
 - During an active accepted job, an artisan can explicitly start or stop GPS
   sharing. Only that booking's customer can retrieve the latest point; points
-  are removed when sharing stops or the job ends. Browser geolocation requires
+  are removed when sharing stops or the job ends. Customers see the point on
+  an OpenStreetMap tile map rather than as coordinates; viewing the map sends
+  the location to OpenStreetMap's tile servers. Browser geolocation requires
   HTTPS outside localhost.
 - Visible signed-in sessions refresh matching jobs and notifications every
   five seconds. New updates appear in an in-app popup without reloading.
@@ -168,7 +170,8 @@ Response headers (every static + API response carries them):
     style-src-attr 'unsafe-inline'; (Paystack's checkout UI requires inline
       style attributes; shipped app markup still has none)
     font-src 'self' https://fonts.gstatic.com;
-    img-src 'self' data: blob:;        (data: = canvas photo previews,
+    img-src 'self' data: blob: https://tile.openstreetmap.org;
+                                        (data: = canvas photo previews,
     media-src 'self' blob:;             blob: = photo/voice object URLs —
                                         functionally required, kept here only)
     connect-src 'self' https://*.supabase.co https://api.bigdatacloud.net
