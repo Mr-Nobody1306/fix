@@ -39,6 +39,8 @@ Project layout:
       chat.js            # POST /api/chat: validate -> Groq -> answer
       rateLimit.js       # per-IP sliding-window limiter
       static.js          # traversal-safe static serving + headers
+      admin.js           # private admin authorization, artisan moderation, analytics
+      admin-management.js # account, service, and booking administration
     public/              # EVERYTHING the browser may download
       index.html         # markup + views (loads the files below)
       styles.css         # all hand-written CSS (no frameworks)
@@ -75,14 +77,17 @@ Currency and artisan accounts:
   contact numbers are stored separately in `artisan_private_details`, which
   has row-level security so artisans can access only their own phone number.
   Run `src/supabase.sql` first, then `src/artisan-private-details.sql`,
-  `src/admin-portal.sql`, and `src/live-tracking.sql`. The base schema
+  `src/admin-portal.sql`, `src/live-tracking.sql`, and `src/admin-management.sql`.
+  The base schema
   contains `profiles`, `bookings`, and `applications`; the follow-up adds
   `artisan_private_details`, `notifications`, `booking_payment_state`, and
   `artisan_payout_accounts`,
   plus the security policies, indexes, and triggers. The admin migration adds
   suspension enforcement and an audit log. The live-tracking migration makes
   accepted-artisan assignment atomic, protects booking status changes, and
-  enables private, latest-point-only GPS sharing. Apply all four scripts in
+  enables private, latest-point-only GPS sharing. The admin-management
+  migration adds the service catalog, account blocking, and retained audit
+  events. Apply all five scripts in
   order when upgrading an existing deployment. All scripts can be re-run safely.
 - Artisans see only open requests matching their saved trade. Customers and
   artisans receive persistent in-app notifications for applications, job
@@ -102,6 +107,12 @@ Currency and artisan accounts:
 - Suspending an artisan removes them from discovery and prevents new applications.
   Pending applications are declined; existing accepted jobs are not canceled.
   Suspension and reinstatement reasons are recorded in `admin_action_log`.
+- The admin menu includes analytics, accounts, services, bookings, and an audit log.
+  Blocking an account bans sign-in and restricts existing sessions at the database
+  and API layers. Admin accounts cannot be blocked or deleted. Removing a service
+  hides it from new bookings while preserving old bookings. Account and booking
+  deletion is permanent; booking summaries and action reasons remain in the audit
+  log. An artisan with an active accepted job must resolve it before deletion.
 - Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
   `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL`, and `PAYSTACK_SECRET_KEY` in the
   server `.env` or host environment. Never put the service-role or Paystack

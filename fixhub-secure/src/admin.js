@@ -31,6 +31,12 @@ async function authorizeAdmin(req, res, config) {
     fail(res, 403, "This Google account is not authorized for the admin portal.");
     return null;
   }
+  const profiles = await supabase(config,
+    "profiles?select=is_blocked&id=eq." + encodeURIComponent(user.id) + "&limit=1");
+  if (profiles && profiles[0] && profiles[0].is_blocked) {
+    fail(res, 403, "This account is blocked from the admin portal.");
+    return null;
+  }
   return user;
 }
 async function handleAdminArtisans(req, res, config) {
@@ -88,4 +94,4 @@ async function handleAdminOverview(req, res, config) {
     return fail(res, 500, "Could not load admin analytics and audit history.");
   }
 }
-module.exports = { handleAdminArtisans, handleAdminSuspension, handleAdminOverview };
+module.exports = { authorizeAdmin, handleAdminArtisans, handleAdminSuspension, handleAdminOverview };

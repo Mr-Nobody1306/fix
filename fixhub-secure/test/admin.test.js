@@ -92,6 +92,9 @@ t.test("admin artisan list uses the server service-role key after verification",
     if (url.endsWith("/auth/v1/user")) {
       return { ok: true, json: async () => googleUser("OWNER@example.com") };
     }
+    if (url.includes("/rest/v1/profiles?select=is_blocked")) {
+      return { ok: true, text: async () => "[]" };
+    }
     listRequest = { url, options };
     return {
       ok: true,
@@ -116,6 +119,9 @@ t.test("suspension uses the audited server-side RPC", async () => {
   global.fetch = async (url, options) => {
     if (url.endsWith("/auth/v1/user")) {
       return { ok: true, json: async () => googleUser("owner@example.com") };
+    }
+    if (url.includes("/rest/v1/profiles?select=is_blocked")) {
+      return { ok: true, text: async () => "[]" };
     }
     rpcRequest = { url, options };
     return {
@@ -151,6 +157,9 @@ t.test("admin mutation validates suspension reason before calling the database",
   global.fetch = async (url) => {
     if (url.endsWith("/auth/v1/user")) {
       return { ok: true, json: async () => googleUser("owner@example.com") };
+    }
+    if (url.includes("/rest/v1/profiles?select=is_blocked")) {
+      return { ok: true, text: async () => "[]" };
     }
     rpcCalls++;
     throw new Error("Invalid suspension reason must not reach the database.");

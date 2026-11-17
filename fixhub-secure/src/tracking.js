@@ -1,6 +1,6 @@
 "use strict";
 const { sendJson } = require("./static");
-const { currentUser, supabase, readBody } = require("./paystack");
+const { currentActiveUser, supabase, readBody } = require("./paystack");
 
 const BOOKING_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 const ACTIVE_STATUSES = "enroute,arrived,working";
@@ -16,7 +16,7 @@ async function authenticatedUser(req, res, config) {
     fail(res, 503, "Live tracking is not configured on the server.");
     return null;
   }
-  const user = await currentUser(req, config);
+  const user = await currentActiveUser(req, config);
   if (!user) {
     fail(res, 401, "Please sign in again.");
     return null;

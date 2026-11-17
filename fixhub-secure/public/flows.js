@@ -44,14 +44,24 @@ function startBooking(serviceId) {
   fillBook1();
   show("book1");
 }
-function svc(id) { return SERVICES.find(s => s.id === id); }
+function svc(id) {
+  return SERVICES.find(s => s.id === id) || {
+    id: String(id || "unknown"),
+    name: String(id || "Service"),
+    base: 0,
+    tint: "#F1F5F9",
+    color: "#4A5268",
+    blurb: "",
+    icon: '<path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3z"/>'
+  };
+}
 function fillBook1() {
   const s = svc(draft.serviceId);
   document.getElementById("book1Title").textContent = "Book " + s.name;
   document.getElementById("book1Summary").innerHTML =
     `<div class="flex items-center gap-3">
       <span class="w-12 h-12 rounded-full grid place-items-center flex-none ${tintCls(s)}">${svcIcon(s, "w-6 h-6")}</span>
-      <div class="flex-1"><p class="font-display font-extrabold f16">${s.name}</p><p class="f12h text-ink-soft">${s.blurb}</p></div>
+      <div class="flex-1"><p class="font-display font-extrabold f16">${escapeHtml(s.name)}</p><p class="f12h text-ink-soft">${escapeHtml(s.blurb)}</p></div>
       <div class="text-right"><p class="f11 text-ink-soft">EST. TOTAL</p><p class="font-display font-extrabold f18 text-trust-deep">${gh(s.base + TRANSPORT)}</p></div>
     </div>`;
   document.getElementById("jobDesc").value = draft.desc || "";
@@ -105,7 +115,7 @@ document.getElementById("toStep2Btn").onclick = () => {
   document.getElementById("book2Summary").innerHTML =
     `<div class="flex items-center gap-3">
       <span class="w-12 h-12 rounded-full grid place-items-center flex-none ${tintCls(s)}">${svcIcon(s, "w-6 h-6")}</span>
-      <div><p class="font-display font-extrabold f16">${s.name}</p>
+      <div><p class="font-display font-extrabold f16">${escapeHtml(s.name)}</p>
       <p class="f12h text-ink-soft">${draft.area} · ${draft.addr}</p>
       <p class="f12h text-ink-soft">${draft.date} · ${draft.slot}${draft.voiceSecs ? " · voice note (" + draft.voiceSecs + "s)" : ""}${draft.photo ? " · photo attached" : ""}</p></div>
     </div>${draft.desc ? `<p class="f13h mt-2 bg-canvas rounded-xl p-2.5 border border-line">“${escapeHtml(draft.desc)}”</p>` : ""}`;
@@ -822,7 +832,7 @@ async function renderHistory(bookings) {
     const d = document.createElement("div");
     d.className = "bg-ink text-white rounded-2xl shadow-card p-4";
     d.innerHTML = `<div class="flex items-center gap-2"><span class="live-dot"></span>
-        <p class="font-display font-bold f15 flex-1">${svc(a.serviceId).name} · ${a.id}</p>
+        <p class="font-display font-bold f15 flex-1">${escapeHtml(svc(a.serviceId).name)} · ${escapeHtml(a.id)}</p>
         <span class="font-display font-extrabold">${gh(a.total)}</span></div>
       <p class="f13 text-white/80 mt-1">${escapeHtml(aname)} · ${a.etaMin ? "ETA " + a.etaMin + " min · " : ""}${escapeHtml(a.date || "")}, ${escapeHtml(a.slot || "")}</p>
       <div class="grid grid-cols-2 gap-2 mt-3">
@@ -844,7 +854,7 @@ async function renderHistory(bookings) {
     el.className = "bg-white border border-line rounded-2xl shadow-card p-4";
     el.innerHTML = `<div class="flex items-center gap-3">
         <span class="w-11 h-11 rounded-full grid place-items-center flex-none ${tintCls(s)}">${svcIcon(s, "w-5 h-5")}</span>
-        <div class="flex-1 min-w-0"><p class="font-display font-bold f15 truncate">${s.name}</p>
+        <div class="flex-1 min-w-0"><p class="font-display font-bold f15 truncate">${escapeHtml(s.name)}</p>
         <p class="f12 text-ink-soft">${b.date || ""} · ${gh(b.total || 0)} · ${b.method || "—"}</p>
         <p class="f12 text-ink-soft">${b.status === "cancelled" ? "Cancelled (free)" : "Done by " + tech + " · CID-checked"}</p></div>
         <span class="font-display font-extrabold f15">${gh(b.total || 0)}</span></div>
@@ -946,7 +956,7 @@ async function renderOpenMine(all) {
     el.className = "bg-white border border-line rounded-2xl shadow-card p-4";
     el.innerHTML = `<div class="flex items-center gap-3">
       <span class="w-11 h-11 rounded-full grid place-items-center flex-none ${tintCls(s)}">${svcIcon(s, "w-5 h-5")}</span>
-      <div class="flex-1 min-w-0"><p class="font-display font-bold f15 truncate">${s.name} · ${b.id}</p>
+      <div class="flex-1 min-w-0"><p class="font-display font-bold f15 truncate">${escapeHtml(s.name)} · ${escapeHtml(b.id)}</p>
       <p class="f12 text-ink-soft">${b.date || ""} · ${b.slot || ""} · ${gh(b.total || 0)}</p></div>
       <span class="greenpill flex-none">Open</span></div>
       <div class="applicants mt-2 space-y-2"><p class="f12 soft">Checking applications…</p></div>`;
@@ -1262,7 +1272,7 @@ function renderServices() {
     const b = document.createElement("button");
     b.className = "glasscard p-4 flex flex-col items-start gap-2 text-left";
     b.innerHTML = `<span class="w-12 h-12 rounded-full grid place-items-center ${tintCls(s)}">${svcIcon(s, "w-6 h-6")}</span>
-      <span><span class="block font-display font-extrabold f15">${s.name}</span>
+      <span><span class="block font-display font-extrabold f15">${escapeHtml(s.name)}</span>
       <span class="block f12 soft">from ${gh(s.base)} · ${count ? count + (count === 1 ? " artisan" : " artisans") : "No artisans yet"}</span></span>
       <span class="f12 font-bold uptime">Book now →</span>`;
     b.onclick = () => startBooking(s.id);
@@ -1281,7 +1291,7 @@ function artisanDetails(nameValue, phoneValue) {
   return { name, phone };
 }
 function tradeOptions(sel) {
-  return SERVICES.map(s => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${s.name}</option>`).join("");
+  return SERVICES.map(s => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${escapeHtml(s.name)}</option>`).join("");
 }
 function areaOptions(sel) {
   /* Grouped by region; an auto-detected area outside the list is prepended
@@ -1297,6 +1307,15 @@ function renderAccount() {
   const box = document.getElementById("acctBody");
   if (!box) return;
   const g = Auth.googleUid();
+  if (g && S.profile && S.profile.isBlocked) {
+    box.innerHTML = `<div class="glasscard p-4" role="alert">
+      <p class="font-display font-extrabold f16">Account access is blocked</p>
+      <p class="f13 soft mt-2">${escapeHtml(S.profile.blockReason || "This account cannot access ServePoint. Contact support if you believe this is a mistake.")}</p>
+      <button id="blockedAccountLogout" class="btn-dark mt-3 w-full rounded-2xl py-3 font-bold f14">Sign out</button>
+    </div>`;
+    document.getElementById("blockedAccountLogout").onclick = () => { Auth.logout(); show("home"); };
+    return;
+  }
   if (!g || !S.profile) {
     box.innerHTML =
     `<div class="glasscard p-4">
@@ -1457,17 +1476,24 @@ function renderAccount() {
 }
 
 let adminArtisans = [];
+let adminUsers = [];
+let adminServices = [];
+let adminBookings = [];
+let currentAdminTab = "overview";
 function renderAdminOverview(overview) {
   const metrics = document.getElementById("adminMetrics");
-  const audit = document.getElementById("adminAuditList");
-  if (!metrics || !audit) return;
+  const topServices = document.getElementById("adminTopServices");
+  if (!metrics || !topServices) return;
   const artisans = overview.artisans || {};
+  const services = overview.services || {};
   const bookings = overview.bookings || {};
   const payments = overview.payments || {};
   const cards = [
     ["Users", overview.users],
+    ["Blocked accounts", overview.blocked_users],
     ["Active artisans", artisans.active],
     ["Suspended artisans", artisans.suspended],
+    ["Active services", services.active],
     ["Open requests", bookings.open],
     ["Active jobs", bookings.active],
     ["Completed jobs", bookings.completed],
@@ -1487,6 +1513,50 @@ function renderAdminOverview(overview) {
     card.append(title, count);
     metrics.appendChild(card);
   });
+  topServices.innerHTML = "";
+  const serviceRows = Array.isArray(overview.top_services) ? overview.top_services : [];
+  if (!serviceRows.length) {
+    topServices.innerHTML = '<p class="f13 soft">No booking activity yet.</p>';
+    return;
+  }
+  const maxBookings = Math.max(1, ...serviceRows.map((row) => Number(row.bookings) || 0));
+  serviceRows.forEach((row) => {
+    const item = document.createElement("div");
+    item.className = "admin-audit-row";
+    const label = document.createElement("div");
+    label.className = "flex items-center justify-between gap-2";
+    label.innerHTML = `<span class="f13 font-bold">${escapeHtml(svc(row.service) ? svc(row.service).name : row.service || "Unknown service")}</span>
+      <span class="f12 soft">${Number(row.bookings) || 0} requests</span>`;
+    const fill = document.createElement("progress");
+    fill.max = 100;
+    fill.value = Math.round(((Number(row.bookings) || 0) / maxBookings) * 100);
+    fill.setAttribute("aria-label", String(row.service || "Service") + " booking share");
+    fill.className = "admin-analytics-bar";
+    item.append(label, fill);
+    topServices.appendChild(item);
+  });
+}
+function adminActionTitle(action) {
+  const labels = {
+    artisan_suspended: "Artisan suspended",
+    artisan_reinstated: "Artisan restored",
+    user_blocked: "Account blocked",
+    user_unblocked: "Account restored",
+    user_delete_started: "Account deletion started",
+    user_deleted: "Account deleted",
+    user_delete_failed: "Account deletion failed",
+    service_added: "Service added",
+    service_removed: "Service removed",
+    service_restored: "Service restored",
+    booking_delete_started: "Booking deletion started",
+    booking_deleted: "Booking deleted",
+    booking_delete_failed: "Booking deletion failed"
+  };
+  return labels[action] || String(action || "Admin action").replace(/_/g, " ");
+}
+function renderAdminAudit(overview) {
+  const audit = document.getElementById("adminAuditList");
+  if (!audit) return;
   audit.innerHTML = "";
   const entries = Array.isArray(overview.audit) ? overview.audit : [];
   if (!entries.length) {
@@ -1496,12 +1566,167 @@ function renderAdminOverview(overview) {
   entries.forEach((entry) => {
     const row = document.createElement("article");
     row.className = "admin-audit-row";
-    const title = entry.action === "artisan_suspended" ? "Artisan suspended" :
-      entry.action === "artisan_reinstated" ? "Artisan restored" : "Admin action";
-    row.innerHTML = `<p class="f13 font-bold">${title} · ${escapeHtml(String(entry.artisan_id || "").slice(0, 8))}</p>
+    const details = entry.details && typeof entry.details === "object" ? JSON.stringify(entry.details, null, 2) : "";
+    row.innerHTML = `<p class="f13 font-bold">${escapeHtml(adminActionTitle(entry.action))} · ${escapeHtml(entry.target_label || String(entry.target_id || "").slice(0, 12))}</p>
       <p class="f12 soft mt-1">${escapeHtml(entry.admin_email || "Admin")} · ${escapeHtml(entry.created_at ? new Date(entry.created_at).toLocaleString() : "")}</p>
-      ${entry.reason ? `<p class="f12 soft mt-1">${escapeHtml(entry.reason)}</p>` : ""}`;
+      ${entry.reason ? `<p class="f12 soft mt-1">Reason: ${escapeHtml(entry.reason)}</p>` : ""}
+      ${details && details !== "{}" ? `<details><summary>Action details</summary><pre class="f11 soft mt-1">${escapeHtml(details)}</pre></details>` : ""}`;
     audit.appendChild(row);
+  });
+}
+function setAdminTab(tab) {
+  const allowed = ["overview", "accounts", "services", "bookings", "audit"];
+  currentAdminTab = allowed.indexOf(tab) !== -1 ? tab : "overview";
+  document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    const active = button.dataset.adminTab === currentAdminTab;
+    button.classList.toggle("on", active);
+    button.setAttribute("aria-current", active ? "page" : "false");
+  });
+  document.querySelectorAll("[data-admin-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.adminPanel !== currentAdminTab;
+  });
+}
+function renderAdminUsers() {
+  const list = document.getElementById("adminUsersList");
+  if (!list) return;
+  const query = String(document.getElementById("adminAccountSearch").value || "").trim().toLowerCase();
+  const filtered = adminUsers.filter((user) =>
+    [user.name, user.email, user.role, user.trade, user.area].some((value) => String(value || "").toLowerCase().includes(query))
+  );
+  list.innerHTML = "";
+  if (!filtered.length) {
+    list.innerHTML = '<p class="glasscard p-4 f13 soft">No matching user accounts.</p>';
+    return;
+  }
+  filtered.forEach((user) => {
+    const isAdmin = user.role === "admin";
+    const isSelf = user.id === Auth.googleUid();
+    const blocked = !!user.is_blocked;
+    const card = document.createElement("article");
+    card.className = "glasscard p-4 admin-account-card";
+    const actions = isAdmin || isSelf ? '<p class="f12 soft mt-3">Protected admin account</p>' :
+      `<div class="grid grid-cols-2 gap-2 mt-3">
+        <button type="button" class="${blocked ? "rounded-xl border border-line font-bold f13 py-2.5 bg-white" : "rounded-xl bg-cancel text-white font-bold f13 py-2.5"}" data-user-action="block">${blocked ? "Restore access" : "Block account"}</button>
+        <button type="button" class="rounded-xl border border-cancel text-cancel font-bold f13 py-2.5 bg-white" data-user-action="delete">Delete account</button>
+      </div>`;
+    card.innerHTML = `<div class="flex items-start justify-between gap-2">
+      <div class="min-w-0"><p class="font-display font-bold f15">${escapeHtml(user.name || "Unnamed user")}</p>
+      <p class="f12 soft mt-1">${escapeHtml(user.email || "No email")} · ${escapeHtml(user.role || "user")}</p>
+      ${user.trade ? `<p class="f12 soft mt-1">${escapeHtml(user.trade)} · ${escapeHtml(user.area || "No area")}</p>` : ""}
+      <p class="f11 soft mt-1">ID ${escapeHtml(String(user.id).slice(0, 8))} · joined ${escapeHtml(user.created_at ? new Date(user.created_at).toLocaleDateString() : "unknown")}</p></div>
+      <span class="${blocked ? "chipx" : "greenpill"} flex-none">${blocked ? "Blocked" : "Active"}</span>
+    </div>
+    ${blocked && user.block_reason ? `<p class="f12 soft mt-2">Reason: ${escapeHtml(user.block_reason)}</p>` : ""}
+    ${actions}`;
+    card.querySelectorAll("[data-user-action]").forEach((button) => {
+      button.onclick = async (event) => {
+        const action = event.currentTarget.dataset.userAction;
+        const reason = document.getElementById("adminAccountReason").value.trim();
+        if (reason.length < 5 || reason.length > 500) {
+          document.getElementById("adminAccountReason").focus();
+          toast("Enter a reason of 5–500 characters for the audit log.");
+          return;
+        }
+        if (action === "delete" && !window.confirm("Permanently delete " + String(user.name || user.email || "this account") + " and its owned booking records? This cannot be undone.")) return;
+        if (action === "block" && !window.confirm((blocked ? "Restore access for " : "Block all access for ") + String(user.name || user.email || "this account") + "?")) return;
+        const target = event.currentTarget;
+        target.disabled = true;
+        try {
+          if (action === "delete") {
+            await Backend.apiPost("/api/admin/user-delete", { userId: user.id, reason });
+            toast("Account deleted; its booking summary remains in the audit log.");
+          } else {
+            await Backend.apiPost("/api/admin/user-block", { userId: user.id, blocked: !blocked, reason });
+            toast(blocked ? "Account access restored." : "Account blocked from sign-in and ServePoint data.");
+          }
+          await renderAdmin();
+        } catch (error) {
+          target.disabled = false;
+          document.getElementById("adminStatus").textContent = error.message || "Could not update this account.";
+        }
+      };
+    });
+    list.appendChild(card);
+  });
+}
+function renderAdminServices() {
+  const list = document.getElementById("adminServicesList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!adminServices.length) {
+    list.innerHTML = '<p class="glasscard p-4 f13 soft">No services in the catalog.</p>';
+    return;
+  }
+  adminServices.forEach((service) => {
+    const card = document.createElement("article");
+    card.className = "glasscard p-4 flex items-center justify-between gap-3";
+    card.innerHTML = `<div class="min-w-0"><p class="font-display font-bold f15">${escapeHtml(service.name)}</p>
+      <p class="f12 soft mt-1">${escapeHtml(service.id)} · from ${gh(service.starting_price)} · ${service.active ? "Listed" : "Removed"}</p>
+      ${service.description ? `<p class="f12 soft mt-1">${escapeHtml(service.description)}</p>` : ""}</div>
+      <button type="button" class="${service.active ? "rounded-xl border border-cancel text-cancel font-bold f12 py-2 px-3 bg-white" : "rounded-xl border border-line font-bold f12 py-2 px-3 bg-white"}" data-service-active="${service.active ? "false" : "true"}">${service.active ? "Remove" : "Restore"}</button>`;
+    card.querySelector("button").onclick = async (event) => {
+      const active = event.currentTarget.dataset.serviceActive === "true";
+      const reason = String(document.getElementById("adminServiceReason").value || "").trim();
+      if (!active && (reason.length < 5 || reason.length > 500)) {
+        document.getElementById("adminServiceReason").focus();
+        toast("Enter a reason of 5–500 characters to remove a service.");
+        return;
+      }
+      if (!window.confirm((active ? "Restore " : "Remove ") + service.name + (active ? " to the service list?" : " from new bookings? Existing booking history will be kept."))) return;
+      event.currentTarget.disabled = true;
+      try {
+        await Backend.apiPost("/api/admin/service-status", { id: service.id, active, reason });
+        await refreshServiceCatalog(true);
+        toast(active ? "Service restored." : "Service removed from new bookings.");
+        await renderAdmin();
+      } catch (error) {
+        event.currentTarget.disabled = false;
+        document.getElementById("adminStatus").textContent = error.message || "Could not update the service.";
+      }
+    };
+    list.appendChild(card);
+  });
+}
+function renderAdminBookings() {
+  const list = document.getElementById("adminBookingsList");
+  if (!list) return;
+  const query = String(document.getElementById("adminBookingSearch").value || "").trim().toLowerCase();
+  const filtered = adminBookings.filter((booking) =>
+    [booking.id, booking.service, booking.status, booking.area].some((value) => String(value || "").toLowerCase().includes(query))
+  );
+  list.innerHTML = "";
+  if (!filtered.length) {
+    list.innerHTML = '<p class="glasscard p-4 f13 soft">No matching bookings.</p>';
+    return;
+  }
+  filtered.forEach((booking) => {
+    const card = document.createElement("article");
+    card.className = "glasscard p-4";
+    card.innerHTML = `<div class="flex items-start justify-between gap-2">
+      <div class="min-w-0"><p class="font-display font-bold f15">${escapeHtml(booking.service)} · ${escapeHtml(booking.id)}</p>
+      <p class="f12 soft mt-1">${escapeHtml(booking.area || "No area")} · ${escapeHtml(booking.status)}</p>
+      <p class="f12 soft mt-1">${gh(booking.total)} · payment ${escapeHtml(booking.payment_status || "none")} · payout ${escapeHtml(booking.payout_status || "none")}</p></div>
+      <button type="button" class="rounded-xl border border-cancel text-cancel font-bold f12 py-2 px-3 bg-white" data-delete-booking>Delete</button>
+    </div>`;
+    card.querySelector("[data-delete-booking]").onclick = async (event) => {
+      const reason = String(document.getElementById("adminBookingReason").value || "").trim();
+      if (reason.length < 5 || reason.length > 500) {
+        document.getElementById("adminBookingReason").focus();
+        toast("Enter a reason of 5–500 characters for the audit log.");
+        return;
+      }
+      if (!window.confirm("Permanently delete booking " + booking.id + " and its payment-state row? A summary will remain in the audit log.")) return;
+      event.currentTarget.disabled = true;
+      try {
+        await Backend.apiPost("/api/admin/booking-delete", { bookingId: booking.id, reason });
+        toast("Booking deleted and recorded in the audit log.");
+        await renderAdmin();
+      } catch (error) {
+        event.currentTarget.disabled = false;
+        document.getElementById("adminStatus").textContent = error.message || "Could not delete the booking.";
+      }
+    };
+    list.appendChild(card);
   });
 }
 function renderAdminList() {
@@ -1573,18 +1798,61 @@ async function renderAdmin() {
   status.setAttribute("aria-busy", "true");
   workspace.hidden = true;
   switchButton.hidden = true;
+  const menu = document.getElementById("adminMenu");
+  if (menu && !menu.dataset.wired) {
+    menu.dataset.wired = "1";
+    menu.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-admin-tab]");
+      if (button) setAdminTab(button.dataset.adminTab);
+    });
+  }
   switchButton.onclick = () => { Auth.logout(); show("account"); };
   try {
-    const [result, analytics] = await Promise.all([
+    const [result, analytics, users, services, bookings] = await Promise.all([
       Backend.apiGet("/api/admin/artisans"),
-      Backend.apiGet("/api/admin/overview")
+      Backend.apiGet("/api/admin/overview"),
+      Backend.apiGet("/api/admin/users"),
+      Backend.apiGet("/api/admin/services"),
+      Backend.apiGet("/api/admin/bookings")
     ]);
     adminArtisans = Array.isArray(result.artisans) ? result.artisans : [];
-    renderAdminOverview(analytics.overview || {});
+    adminUsers = Array.isArray(users.users) ? users.users : [];
+    adminServices = Array.isArray(services.services) ? services.services : [];
+    adminBookings = Array.isArray(bookings.bookings) ? bookings.bookings : [];
+    const overview = analytics.overview || {};
+    renderAdminOverview(overview);
+    renderAdminAudit(overview);
     status.textContent = "Authorized. Admin actions are recorded in the audit history.";
     status.removeAttribute("aria-busy");
     workspace.hidden = false;
+    setAdminTab(currentAdminTab);
+    document.getElementById("adminAccountSearch").oninput = renderAdminUsers;
+    document.getElementById("adminBookingSearch").oninput = renderAdminBookings;
     document.getElementById("adminSearch").oninput = renderAdminList;
+    document.getElementById("adminServiceForm").onsubmit = async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("adminServiceSubmit");
+      button.disabled = true;
+      try {
+        await Backend.apiPost("/api/admin/services", {
+          name: document.getElementById("adminServiceName").value.trim(),
+          id: document.getElementById("adminServiceKey").value.trim().toLowerCase(),
+          startingPrice: Number(document.getElementById("adminServicePrice").value),
+          description: document.getElementById("adminServiceDescription").value.trim()
+        });
+        await refreshServiceCatalog(true);
+        event.currentTarget.reset();
+        toast("Service added to the catalog.");
+        currentAdminTab = "services";
+        await renderAdmin();
+      } catch (error) {
+        button.disabled = false;
+        status.textContent = error.message || "Could not add the service.";
+      }
+    };
+    renderAdminUsers();
+    renderAdminServices();
+    renderAdminBookings();
     renderAdminList();
   } catch (error) {
     status.textContent = error.message || "Could not verify admin access.";

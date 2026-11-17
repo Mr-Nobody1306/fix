@@ -519,22 +519,79 @@
         <p id="adminStatus" class="glasscard p-4 f13 text-ink-soft" role="status" aria-live="polite">Sign in with the authorized Google account to view this private portal.</p>
         <button id="adminSwitchAccount" class="w-full font-bold f14 rounded-2xl py-3.5 mh52 border border-line bg-white" hidden>Switch Google account</button>
         <div id="adminWorkspace" hidden>
-          <section aria-labelledby="adminMetricsTitle">
-            <h3 id="adminMetricsTitle" class="font-display font-bold f15 mb-2">ServePoint overview</h3>
+          <nav id="adminMenu" class="admin-menu" aria-label="Admin menu">
+            <button type="button" class="admin-menu-button on" data-admin-tab="overview">Analytics</button>
+            <button type="button" class="admin-menu-button" data-admin-tab="accounts">Accounts</button>
+            <button type="button" class="admin-menu-button" data-admin-tab="services">Services</button>
+            <button type="button" class="admin-menu-button" data-admin-tab="bookings">Bookings</button>
+            <button type="button" class="admin-menu-button" data-admin-tab="audit">Audit log</button>
+          </nav>
+          <section id="adminPanel-overview" data-admin-panel="overview" aria-labelledby="adminMetricsTitle">
+            <h3 id="adminMetricsTitle" class="font-display font-bold f15 mb-2">ServePoint analytics</h3>
             <div id="adminMetrics" class="admin-metrics"></div>
+            <section class="glasscard p-4 mt-3" aria-labelledby="adminTopServicesTitle">
+              <h3 id="adminTopServicesTitle" class="font-display font-bold f15">Requests by service</h3>
+              <div id="adminTopServices" class="mt-3 space-y-2"></div>
+            </section>
           </section>
-          <section class="glasscard p-4 mt-3" aria-labelledby="adminAuditTitle">
-            <h3 id="adminAuditTitle" class="font-display font-bold f15">Recent admin audit</h3>
-            <p class="f12 soft mt-1">Latest suspension and restoration actions.</p>
-            <div id="adminAuditList" class="mt-3 space-y-2"></div>
+          <section id="adminPanel-accounts" data-admin-panel="accounts" hidden>
+            <div class="glasscard p-4">
+              <h3 class="font-display font-bold f15">User and artisan accounts</h3>
+              <p class="f12 soft mt-1">Blocking denies sign-in and app data access. Deleting an account permanently removes its owned bookings. Admin accounts cannot be blocked or deleted.</p>
+            </div>
+            <label for="adminAccountSearch" class="block f12 font-bold text-ink-soft mt-3 mb-1">Find a user</label>
+            <input id="adminAccountSearch" class="field rounded-xl p-3 f14 w-full" type="search" placeholder="Search name, email or role">
+            <label for="adminAccountReason" class="block f12 font-bold text-ink-soft mt-3 mb-1">Reason for block, restore or deletion</label>
+            <textarea id="adminAccountReason" class="field rounded-xl p-3 f13 w-full" maxlength="500" placeholder="Required for audit (5–500 characters)"></textarea>
+            <div id="adminUsersList" class="mt-3 space-y-3"></div>
+            <div class="glasscard p-4 mt-4">
+              <h3 class="font-display font-bold f15">Artisan job suspensions</h3>
+              <p class="f12 soft mt-1">Suspension blocks new applications while preserving accepted jobs. Use account blocking above to prevent all sign-in and app access.</p>
+              <label for="adminSearch" class="block f12 font-bold text-ink-soft mt-3 mb-1">Find an artisan</label>
+              <input id="adminSearch" class="field rounded-xl p-3 f14 w-full" type="search" placeholder="Search name, trade or area">
+              <div id="adminList" class="mt-3 space-y-3"></div>
+            </div>
           </section>
-          <div class="glasscard p-4">
-            <p class="font-display font-bold f15">Artisan accounts</p>
-            <p class="f12 soft mt-1">Suspending blocks new applications and removes the artisan from discovery. Existing accepted jobs remain available.</p>
-          </div>
-          <label for="adminSearch" class="block f12 font-bold text-ink-soft mt-3 mb-1">Find an artisan</label>
-          <input id="adminSearch" class="field rounded-xl p-3 f14 w-full" type="search" placeholder="Search name, trade or area">
-          <div id="adminList" class="mt-3 space-y-3"></div>
+          <section id="adminPanel-services" data-admin-panel="services" hidden>
+            <form id="adminServiceForm" class="glasscard p-4 space-y-3">
+              <h3 class="font-display font-bold f15">Add a service</h3>
+              <label class="block f12 font-bold text-ink-soft">Service name
+                <input id="adminServiceName" class="field rounded-xl p-3 f14 w-full mt-1" required minlength="2" maxlength="80" placeholder="Appliance Repair">
+              </label>
+              <label class="block f12 font-bold text-ink-soft">Trade/category key
+                <input id="adminServiceKey" class="field rounded-xl p-3 f14 w-full mt-1" required maxlength="60" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="appliance-repair">
+              </label>
+              <label class="block f12 font-bold text-ink-soft">Starting price (GH₵)
+                <input id="adminServicePrice" class="field rounded-xl p-3 f14 w-full mt-1" type="number" min="0" max="100000" step="0.01" required>
+              </label>
+              <label class="block f12 font-bold text-ink-soft">Description
+                <input id="adminServiceDescription" class="field rounded-xl p-3 f14 w-full mt-1" maxlength="240" placeholder="Short description of the work">
+              </label>
+              <button id="adminServiceSubmit" class="btn-dark w-full rounded-2xl py-3 font-bold f14" type="submit">Add service</button>
+            </form>
+            <p class="f12 soft mt-3">Removing a service hides it from new bookings; existing booking history remains intact.</p>
+            <label for="adminServiceReason" class="block f12 font-bold text-ink-soft mt-3 mb-1">Reason for removing a service</label>
+            <textarea id="adminServiceReason" class="field rounded-xl p-3 f13 w-full" maxlength="500" placeholder="Required for audit (5–500 characters)"></textarea>
+            <div id="adminServicesList" class="mt-3 space-y-3"></div>
+          </section>
+          <section id="adminPanel-bookings" data-admin-panel="bookings" hidden>
+            <div class="glasscard p-4">
+              <h3 class="font-display font-bold f15">Booking records</h3>
+              <p class="f12 soft mt-1">Deletion is permanent. A summary is kept in the audit log.</p>
+            </div>
+            <label for="adminBookingSearch" class="block f12 font-bold text-ink-soft mt-3 mb-1">Find a booking</label>
+            <input id="adminBookingSearch" class="field rounded-xl p-3 f14 w-full" type="search" placeholder="Booking ID, service or status">
+            <label for="adminBookingReason" class="block f12 font-bold text-ink-soft mt-3 mb-1">Deletion reason</label>
+            <textarea id="adminBookingReason" class="field rounded-xl p-3 f13 w-full" maxlength="500" placeholder="Required for audit (5–500 characters)"></textarea>
+            <div id="adminBookingsList" class="mt-3 space-y-3"></div>
+          </section>
+          <section id="adminPanel-audit" data-admin-panel="audit" hidden aria-labelledby="adminAuditTitle">
+            <div class="glasscard p-4">
+              <h3 id="adminAuditTitle" class="font-display font-bold f15">Admin audit log</h3>
+              <p class="f12 soft mt-1">Recent moderation, service, account, and booking actions. Entries are retained after account or booking deletion.</p>
+              <div id="adminAuditList" class="mt-3 space-y-2"></div>
+            </div>
+          </section>
         </div>
       </div>
     </section>

@@ -54,7 +54,7 @@ describe("backend isolation", function () {
     assert.ok(!/gsk_[A-Za-z0-9]/.test(ex), ".env.example must not contain a real key");
   });
   it("every backend module the server loads exists", function () {
-    const names = ["src/config.js", "src/persona.js", "src/ai.js", "src/chat.js", "src/rateLimit.js", "src/static.js", "src/paystack.js", "src/admin.js"];
+    const names = ["src/config.js", "src/persona.js", "src/ai.js", "src/chat.js", "src/rateLimit.js", "src/static.js", "src/paystack.js", "src/admin.js", "src/admin-management.js"];
     for (const f of names) assert.ok(fs.existsSync(path.join(ROOT, f)), f + " missing");
   });
   it("public config contains only the intended public credentials", function () {
@@ -106,6 +106,20 @@ describe("backend isolation", function () {
     assert.match(trackingSchema, /can_view_servepoint_booking\(customer_id, owner_id, artisan_id, service\)/);
     assert.match(baseSchema, /grant update \(status\) on public\.applications to authenticated/);
     assert.match(trackingSchema, /revoke update on public\.applications from authenticated/);
+  });
+  it("restricts account access and audits service management in the database", function () {
+    const schema = read("src/admin-management.sql");
+    assert.match(schema, /profiles_active_account_only/);
+    assert.match(schema, /servepoint_account_is_active/);
+    assert.match(schema, /is_blocked boolean not null default false/);
+    assert.match(schema, /service_catalog_active_read/);
+    assert.match(schema, /grant select on public\.service_catalog to authenticated/);
+    assert.match(schema, /admin_create_service/);
+    assert.match(schema, /admin_set_service_active/);
+    assert.match(schema, /admin_audit_events/);
+    assert.match(schema, /grant execute on function public\.admin_create_service.*to service_role/s);
+    assert.match(schema, /grant execute on function public\.admin_set_service_active.*to service_role/s);
+    assert.match(schema, /on delete set null/);
   });
 });
 describe("currency and artisan profile behavior", function () {

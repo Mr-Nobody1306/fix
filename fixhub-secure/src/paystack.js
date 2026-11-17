@@ -161,6 +161,14 @@ async function currentUser(req, config) {
   const user = await response.json();
   return user && user.id ? user : null;
 }
+async function currentActiveUser(req, config) {
+  const user = await currentUser(req, config);
+  if (!user) return null;
+  const profiles = await supabase(config,
+    "profiles?select=is_blocked&id=eq." + encodeURIComponent(user.id) + "&limit=1");
+  if (profiles && profiles[0] && profiles[0].is_blocked) return null;
+  return user;
+}
 async function handleBanks(req, res, config) {
   if (req.method !== "GET") return fail(res, 405, "Use GET.");
   if (!config.paystackSecretKey || /PASTE|YOUR_/i.test(config.paystackSecretKey)) return fail(res, 503, "Paystack is not configured on the server.");
@@ -177,7 +185,7 @@ async function handleRecipient(req, res, config) {
   if (!envReady(config, true)) return fail(res, 503, "Payout setup is not configured on the server.");
   let user, body;
   try {
-    user = await currentUser(req, config);
+    user = await currentActiveUser(req, config);
     if (!user) return fail(res, 401, "Please sign in again.");
     body = JSON.parse((await readBody(req)).toString("utf8"));
   } catch (e) { return fail(res, e.statusCode || 400, e.message || "Invalid request."); }
@@ -210,7 +218,7 @@ async function handleCompletion(req, res, config) {
   if (!envReady(config, true)) return fail(res, 503, "Payouts are not configured on the server.");
   let user, body;
   try {
-    user = await currentUser(req, config);
+    user = await currentActiveUser(req, config);
     if (!user) return fail(res, 401, "Please sign in again.");
     body = JSON.parse((await readBody(req)).toString("utf8"));
   } catch (e) { return fail(res, e.statusCode || 400, e.message || "Invalid request."); }
@@ -289,7 +297,7 @@ async function handleBookingStatus(req, res, config) {
   }
   let user, body;
   try {
-    user = await currentUser(req, config);
+    user = await currentActiveUser(req, config);
     if (!user) return fail(res, 401, "Please sign in again.");
     body = JSON.parse((await readBody(req)).toString("utf8"));
   } catch (e) { return fail(res, e.statusCode || 400, e.message || "Invalid request."); }
@@ -322,7 +330,7 @@ async function handlePaymentStatus(req, res, config) {
       /PASTE|YOUR_/i.test(config.supabaseUrl + config.supabaseAnonKey + config.supabaseServiceRoleKey)) {
     return fail(res, 503, "Payment status is not configured on the server.");
   }
-  const user = await currentUser(req, config);
+  const user = await currentActiveUser(req, config);
   if (!user) return fail(res, 401, "Please sign in again.");
   const url = new URL(req.url || "/", "http://localhost");
   const bookingId = String(url.searchParams.get("bookingId") || "");
@@ -342,5 +350,5 @@ async function handlePaymentStatus(req, res, config) {
 }
 module.exports = {
   handleWebhook, handleBanks, handleRecipient, handleCompletion, handleBookingStatus, handlePaymentStatus,
-  signatureMatches, processPaymentEvent, currentUser, supabase, readBody
+  signatureMatches, processPaymentEvent, currentUser, currentActiveUser, supabase, readBody
 };

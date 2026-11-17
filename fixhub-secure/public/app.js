@@ -20,7 +20,7 @@ const LIVE_PAY = hasLivePaystack();
 const LIVE_DB = CFG.supabaseUrl && CFG.supabaseUrl.indexOf("PASTE") !== 0 && CFG.supabaseKey && CFG.supabaseKey.indexOf("PASTE") !== 0;
 window.APP_REV = "secure-2026-11-12";
 
-const SERVICES = [
+let SERVICES = [
   { id: "plumbing", name: "Plumbing", base: 80, tint: "#E0F2FE", color: "#0369A1", blurb: "Leaks, pipes, tanks & fittings",
     icon: '<path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3z"/>' },
   { id: "electrical", name: "Electrical", base: 90, tint: "#FEF3C7", color: "#B45309", blurb: "Wiring, sockets & faults",
@@ -371,7 +371,37 @@ function rowToBooking(r) {
   return { id: r.id, ownerId: r.owner_id || null, customerId: r.customer_id || null, artisanId: r.artisan_id || null, serviceId: r.service, desc: r.description, area: r.area, slot: r.slot, date: r.date, total: Number(r.total), service: r.service_amount == null ? null : Number(r.service_amount), transport: r.transport_amount == null ? null : Number(r.transport_amount), discount: r.discount_amount == null ? null : Number(r.discount_amount), payRef: r.payment_reference || null, method: r.method, status: r.status, tech: r.tech, prog: (r.prog != null ? Number(r.prog) : null), offRoute: !!r.offroute, techRating: (r.tech_rating != null ? Number(r.tech_rating) : null), techJobs: (r.tech_jobs != null ? Number(r.tech_jobs) : null) };
 }
 function rowToProfile(r) {
-  return { id: r.id, role: r.role, name: r.name, trade: r.trade || null, area: r.area || null, rating: (r.rating != null ? Number(r.rating) : 5.0), jobs: (r.jobs != null ? Number(r.jobs) : 0), isSuspended: !!r.is_suspended, suspensionReason: r.suspension_reason || null, suspendedAt: r.suspended_at || null };
+  return { id: r.id, role: r.role, name: r.name, trade: r.trade || null, area: r.area || null, rating: (r.rating != null ? Number(r.rating) : 5.0), jobs: (r.jobs != null ? Number(r.jobs) : 0), isSuspended: !!r.is_suspended, isBlocked: !!r.is_blocked, blockReason: r.block_reason || null, suspensionReason: r.suspension_reason || null, suspendedAt: r.suspended_at || null };
+}
+async function refreshServiceCatalog(showError) {
+  try {
+    const response = await fetch("/api/services");
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Could not load services.");
+    if (!Array.isArray(result.services)) throw new Error("The service catalog response is invalid.");
+    const previous = new Map(SERVICES.map((service) => [service.id, service]));
+    SERVICES = result.services.map((service) => {
+      const id = String(service.id || "");
+      const known = previous.get(id);
+      return {
+        id,
+        name: String(service.name || id),
+        base: Number(service.starting_price),
+        tint: known ? known.tint : "#E6F4EC",
+        color: known ? known.color : "#0A7A42",
+        blurb: String(service.description || (known && known.blurb) || ""),
+        icon: known ? known.icon : '<path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3z"/>'
+      };
+    }).filter((service) => service.id && Number.isFinite(service.base));
+    renderCats(document.getElementById("searchInput") ? document.getElementById("searchInput").value : "");
+    if (typeof renderHomeExtras === "function") renderHomeExtras();
+    const servicesView = document.getElementById("view-services");
+    if (servicesView && !servicesView.hidden && typeof renderServices === "function") renderServices();
+  } catch (error) {
+    console.error("[service catalog]", error.message);
+    if (showError) toast(error.message || "Could not refresh the services.");
+    throw error;
+  }
 }
 async function ensureProfile() {
   if (!LIVE_DB) return null;
@@ -460,6 +490,11 @@ function requireSignedInForProtectedView(name) {
   const signedIn = !!(Auth && typeof Auth.googleUid === "function" && Auth.googleUid()) && !!(S && S.profile);
   if (!signedIn) {
     toast(name === "admin" ? "Sign in with the authorized Google account to open the admin portal." : "Please sign in with Google before accessing services and bookings.");
+    if (name !== "account") show("account");
+    return false;
+  }
+  if (S.profile.isBlocked) {
+    toast("This account is blocked from using ServePoint. Contact support for help.");
     if (name !== "account") show("account");
     return false;
   }
@@ -581,7 +616,7 @@ function renderCats(filter) {
     const b = document.createElement("button");
     b.className = "sphome-card";
     b.innerHTML = `<span class="sphome-ic ${tintCls(s)}">${svcIcon(s, "w-6 h-6")}</span>
-      <span class="sphome-tx"><b>${s.name}</b><i data-prov="${s.id}">from ${gh(s.base)}</i></span>
+      <span class="sphome-tx"><b>${escapeHtml(s.name)}</b><i data-prov="${s.id}">from ${gh(s.base)}</i></span>
       <span class="sphome-chev"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></span>`;
     b.onclick = () => startBooking(s.id);
     grid.appendChild(b);
@@ -918,7 +953,7 @@ function renderUpcoming() {
   d.className = "glasscard p-4 flex items-center gap-3";
   d.innerHTML = `<span class="w-12 h-12 rounded-full grid place-items-center flex-none ${tintCls(s)}">${svcIcon(s, "w-6 h-6")}</span>
     <div class="flex-1 min-w-0"><p class="f11 font-bold uptime">${a ? (target.status === "arrived" ? "Artisan arrived" : "Artisan accepted") + " · " + target.slot : (target.date || "") + " · " + (target.slot || "")}</p>
-    <p class="font-display font-extrabold f15 truncate">${s.name}</p>
+    <p class="font-display font-extrabold f15 truncate">${escapeHtml(s.name)}</p>
     <p class="f12 soft truncate">${escapeHtml(provider)} · ${escapeHtml(target.area || "")}</p></div>
     <button class="chipx on flex-none" id="upcomingView">View</button>`;
   box.appendChild(d);
@@ -933,3 +968,4 @@ document.querySelectorAll("[data-start]").forEach(b => { b.onclick = () => start
 document.getElementById("areaPill").onclick = () => { locateUser({ silent: false }); };
 applySenior();
 renderCats("");
+refreshServiceCatalog(false).catch(() => {});

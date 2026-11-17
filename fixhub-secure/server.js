@@ -9,6 +9,11 @@ const { serveStatic, sendJson, securityHeaders, configureHeaders } = require("./
 const { handleChat } = require("./src/chat");
 const { handleWebhook, handleBanks, handleRecipient, handleCompletion, handleBookingStatus, handlePaymentStatus } = require("./src/paystack");
 const { handleAdminArtisans, handleAdminSuspension, handleAdminOverview } = require("./src/admin");
+const {
+  handlePublicServices, handleAdminUsers, handleAdminUserBlock, handleAdminUserDelete,
+  handleAdminServices, handleAdminServiceCreate, handleAdminServiceStatus,
+  handleAdminBookings, handleAdminBookingDelete
+} = require("./src/admin-management");
 const { handleBookingLocation } = require("./src/tracking");
 configureHeaders(config);
 const limiter = createRateLimiter({ windowMs: 60 * 1000, max: config.chatMaxPerMin });
@@ -110,6 +115,42 @@ function onRequest(req, res) {
   }
   if (pathname === "/api/admin/overview") {
     dispatchAdmin(handleAdminOverview, req, res);
+    return;
+  }
+  if (pathname === "/api/services") {
+    Promise.resolve(handlePublicServices(req, res, config)).catch((err) => {
+      console.error("[service catalog] unhandled:", err && err.message);
+      if (!res.headersSent) sendJson(res, 500, { error: "Could not load the service catalog." });
+    });
+    return;
+  }
+  if (pathname === "/api/admin/users") {
+    dispatchAdmin(handleAdminUsers, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/user-block") {
+    dispatchAdmin(handleAdminUserBlock, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/user-delete") {
+    dispatchAdmin(handleAdminUserDelete, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/services") {
+    if (req.method === "GET") return dispatchAdmin(handleAdminServices, req, res);
+    if (req.method === "POST") return dispatchAdmin(handleAdminServiceCreate, req, res);
+    return sendJson(res, 405, { error: "Use GET or POST." });
+  }
+  if (pathname === "/api/admin/service-status") {
+    dispatchAdmin(handleAdminServiceStatus, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/bookings") {
+    dispatchAdmin(handleAdminBookings, req, res);
+    return;
+  }
+  if (pathname === "/api/admin/booking-delete") {
+    dispatchAdmin(handleAdminBookingDelete, req, res);
     return;
   }
   if (pathname === "/api/chat") {
