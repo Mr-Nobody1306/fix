@@ -85,6 +85,7 @@ describe("backend isolation", function () {
     assert.match(base, /profiles_active_artisan_directory/);
     assert.match(base, /p\.is_suspended = false/);
     assert.match(privateSchema, /p\.is_suspended = false/);
+    assert.match(privateSchema, /create or replace function public\.can_view_servepoint_booking/);
     assert.match(adminSchema, /security definer/);
     assert.match(adminSchema, /profiles_prevent_client_suspension_changes/);
     assert.match(adminSchema, /artisan_suspension_is_server_managed/);

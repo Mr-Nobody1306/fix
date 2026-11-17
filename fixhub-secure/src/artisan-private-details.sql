@@ -100,7 +100,7 @@ drop policy if exists bookings_matching_artisan_select on public.bookings;
 drop policy if exists bookings_skill_scoped_visibility on public.bookings;
 drop function if exists public.can_view_servepoint_booking(uuid, uuid, text);
 
-create function public.can_view_servepoint_booking(
+create or replace function public.can_view_servepoint_booking(
   booking_customer_id uuid, booking_owner_id uuid, booking_artisan_id uuid, booking_service text
 ) returns boolean
 language sql stable security definer
